@@ -1,126 +1,61 @@
 # Elementor JSON Lab
 
-A reusable QA pipeline for Elementor JSON templates. It combines source-level JSON checks with a disposable WordPress + Elementor runtime and browser screenshots.
+Controlled-runtime QA for Elementor JSON. The repository validates source JSON, exercises Elementor's Template Library importer, compares importer storage semantically, renders the imported result in a pinned disposable WordPress/Elementor runtime, and runs responsive browser checks.
 
-`runtime-contract.json` is the machine-readable contract that tells Project Elementor and the Elementor skill when this repository is the correct controlled runtime, why it is used, which inputs it accepts, what it must execute and which evidence it may return. The detailed caller/handoff contract is documented in `docs/project-elementor-integration.md`.
+`runtime-contract.json` is the machine-readable evidence contract. Project Elementor remains the domain owner; this repository is only the controlled-runtime capability.
 
-## When Project Elementor should use this repository
+## When to use it
 
-Use this repository when Elementor JSON must move beyond source-only inspection into reproducible runtime evidence, including:
+Use this repository when Elementor JSON needs evidence beyond source inspection, including new or screenshot-reconstructed JSON, structural/widget/responsive changes, importer or roundtrip checks, browser rendering, dependency checks, or Pro/runtime verification.
 
-- new or screenshot-reconstructed Elementor JSON that must be rendered or visually checked;
-- existing JSON changes to structure, widgets, widget settings, responsive behavior or dependencies;
-- requests to test, scan, render, preview, screenshot, verify widgets, verify Pro or check import behavior;
-- any claim that source-valid JSON also works in a real disposable WordPress/Elementor runtime.
+Do not use it for production writes or claim exact target compatibility without target/staging evidence. The repository is public: never commit credentials, license keys, personal data, confidential client JSON/screenshots, private URLs, or confidential target inventories.
 
-Do not use it for explanation/planning only, production writes, or exact target compatibility without target evidence. Because this repository is public, never commit confidential client JSON, private screenshots, credentials, personal data, license keys or secret URLs. Use sanitized fixtures or a private controlled runtime for sensitive work.
+## Current QA chain
 
-## What it does
-
-1. Reads Elementor export JSON from `templates/`.
-2. Audits the document structure, element IDs, editor family, `widgetType` values and widget settings.
-3. Starts a disposable WordPress environment with Hello Elementor and Elementor Free.
-4. Optionally installs and activates Elementor Pro when the repository secret `ELEMENTOR_PRO_LICENSE_KEY` is configured.
-5. Uses the included WordPress plugin to export the widgets and controls actually registered by Elementor in that runtime.
-6. Fails when a JSON template requests a widget that the runtime does not provide.
-7. Renders valid templates into isolated Elementor Canvas pages.
-8. Captures desktop, tablet and mobile screenshots with Playwright.
-9. Uploads audit reports, runtime metadata, render manifests and screenshots as GitHub Actions artifacts.
+1. Validate `runtime-contract.json` and run Python unit tests.
+2. Run the classic/widget auditor plus deep Classic/Atomic structural checks, including typed Atomic props/styles and repeater-ID checks.
+3. Install the exact npm dependency graph with `npm ci` and fail on high/critical npm audit findings.
+4. Start pinned WordPress 7.0.2 / PHP 8.3 via wp-env.
+5. Install pinned Elementor Core 4.2.2 and Hello Elementor 3.4.9.
+6. Optionally install/activate Elementor Pro from Elementor's official Composer repository when `ELEMENTOR_PRO_LICENSE_KEY` exists as an Actions secret.
+7. Export the registered widget/control inventory and verify runtime versions.
+8. Audit source JSON against the runtime and optional sanitized target inventory.
+9. Import every template through `wp --user=admin elementor library import`.
+10. Export the importer-stored document and compare `content` + `page_settings` semantically. Element IDs are treated as importer-volatile; the proven importer omission of `isInner: false` is accepted only on importer output. Source JSON remains strict.
+11. Re-audit importer output and render it to isolated Elementor Canvas pages.
+12. Test Chromium, Firefox and WebKit at desktop/tablet/mobile plus active Elementor breakpoint boundaries, including reduced-motion, console/page errors, same-origin failed requests/4xx/5xx, broken images, horizontal overflow and basic keyboard focus.
+13. Upload dependency, audit, importer/roundtrip, inventory, render, Pro-status, screenshot and Playwright evidence; then tear the runtime down.
 
 ## Repository layout
 
 ```text
-.github/workflows/validate.yml        GitHub Actions QA pipeline
-.wp-env.json                          Disposable WordPress/Elementor environment
-runtime-contract.json                 Machine-readable trigger/runtime/evidence contract
-docs/project-elementor-integration.md Detailed Project Elementor caller/handoff contract
-package.json                          wp-env and Playwright versions
-playwright.config.js                  Browser test configuration
-templates/                            Put Elementor JSON templates here
-target/inventory.json                 Optional target-site widget inventory
-tools/audit_elementor_json.py         JSON/widget/settings auditor
-wordpress-plugin/elementor-json-lab/  Runtime scanner + preview WP-CLI commands
-tests/                                Auditor and browser tests
+.github/workflows/validate.yml          Main QA pipeline
+.github/dependabot.yml                  Weekly npm and Actions dependency updates
+.wp-env.json                            Pinned disposable WordPress/PHP environment
+package.json / package-lock.json        Exact Node dependency contract
+runtime-contract.json                   Machine-readable evidence boundary
+docs/project-elementor-integration.md   Project routing/handoff contract
+templates/                              Canonical sanitized Elementor JSON fixtures
+target/inventory.json                   Optional sanitized target inventory
+tools/audit_elementor_json.py           Classic/widget/dependency auditor
+tools/validate_elementor_deep.py        Deep Classic/Atomic structural validator
+tools/compare_elementor_roundtrip.py    Importer semantic comparison
+wordpress-plugin/elementor-json-lab/    Runtime inventory/export/render CLI helper
+tests/                                  Unit and Playwright browser tests
 ```
-
-## Normal workflow
-
-Put one or more Elementor JSON exports directly in `templates/`, for example:
-
-```text
-templates/homepage.json
-```
-
-Push or update the file. The `Elementor JSON QA` workflow runs automatically. CI first validates `runtime-contract.json`, so the repository fails closed if its routing/evidence contract drifts.
-
-The workflow produces:
-
-- `static-audit`: source-only JSON reports.
-- `elementor-runtime-qa`: registered widget inventory, runtime audit, render manifests, Elementor Pro status, Playwright report and desktop/tablet/mobile screenshots.
-
-Template filenames become preview slugs. `homepage.json` is rendered at `/homepage/` inside the temporary test site.
 
 ## Elementor Pro
 
-Elementor Pro is never committed to this repository. The CI workflow uses Elementor's official Composer repository when a license key is available.
+Pro is never committed. Configure one repository Actions secret named exactly `ELEMENTOR_PRO_LICENSE_KEY`. When present, CI authenticates to Elementor's Composer repository, installs Pro, activates its license, verifies that a Pro version and Pro-owned widgets exist in the runtime inventory, runs the same audit/import/render/browser chain, and deactivates the temporary license during cleanup.
 
-One-time GitHub setup:
+Without that secret the run is explicitly Free-only; `elementor-pro-status.json` records the mode. A green Free-only run is not Pro evidence.
 
-1. Open the repository settings.
-2. Go to `Secrets and variables` > `Actions`.
-3. Create a repository secret named exactly `ELEMENTOR_PRO_LICENSE_KEY`.
-4. Paste your valid Elementor Pro license key as the secret value.
+## Target inventory
 
-On the next workflow run the pipeline will automatically:
-
-1. Install Elementor Core.
-2. Authenticate Composer against `composer.elementor.com` using the secret.
-3. Install `elementor/elementor-pro` through Composer.
-4. Activate the Elementor Pro plugin.
-5. Activate the Pro license through Elementor CLI.
-6. Export the actual Core + Pro widget/control inventory.
-7. Audit and render the supplied JSON using that runtime.
-8. Create desktop, tablet and mobile screenshots.
-9. Deactivate the temporary Pro license before destroying the WordPress environment.
-
-If the secret is not configured, the same workflow continues in Elementor Free mode. The artifact contains `elementor-pro-status.json` so it is explicit which runtime was used.
-
-Do not commit the license key, an Elementor Pro ZIP, Composer auth files, private download URLs or other credentials to this public repository.
-
-## Target-site and add-on inventory
-
-For accurate ownership/dependency checks against a real installation, install `wordpress-plugin/elementor-json-lab` on a controlled WordPress/Elementor environment and export its inventory:
-
-```bash
-wp ejl inventory --output=/tmp/inventory.json
-```
-
-Save the resulting JSON as `target/inventory.json`. The auditor can then distinguish widgets registered by Elementor Core, Elementor Pro and third-party add-ons on that target.
-
-A target inventory proves availability in the scanned installation. Add-on widgets still require the matching add-on plugin in the preview runtime before their visual rendering can be considered verified.
-
-## Commands
-
-Audit a template without WordPress:
-
-```bash
-python tools/audit_elementor_json.py templates/homepage.json
-```
-
-Audit against an exported target inventory:
-
-```bash
-python tools/audit_elementor_json.py templates/homepage.json \
-  --inventory target/inventory.json \
-  --output artifacts/homepage-target.json
-```
-
-Create/update a preview page inside a WordPress runtime where the plugin is active:
-
-```bash
-wp ejl render /path/to/homepage.json --slug=homepage
-```
+`wp ejl inventory --output=/tmp/inventory.json` can export a controlled installation's registered widget/control inventory. Only put it in `target/inventory.json` when it is safe for this public repository. A target inventory proves availability only; it does not prove target rendering, site IDs, globals, conditions, dynamic data, or staging behavior. Confidential targets require a private runtime/input route.
 
 ## Evidence boundary
 
-A clean source audit is not the same as a verified target import. This repository returns `controlled_runtime` evidence: it can prove its disposable runtime, widget availability and configured viewport renders, but it cannot by itself prove exact customer staging compatibility, target-specific IDs, production behavior or full accessibility compliance.
+A green run supports only `controlled_runtime` evidence for the exact pinned disposable environment and covered fixtures. It does not by itself prove customer staging compatibility, `target_verified`, production behavior, editor UI reopen/save/re-export, site-specific objects/globals/conditions/dynamic data, Pro when the secret was absent, pixel-perfect equality without an approved reference visual, or full accessibility/assistive-technology compliance.
+
+For formal completion after implementation changes, require two stable green final controlled-runtime rounds, then use staging/`website-qa-checklist` when target or release claims are required.
