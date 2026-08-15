@@ -7,9 +7,57 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 
+# Elementor's official Template Library importer materializes a small set of
+# empty control defaults that are not semantically different from an omitted
+# control. Keep this list deliberately narrow: unknown keys and every non-empty
+# value remain strict roundtrip differences.
+EMPTY_IMPORTER_DEFAULT_SETTING_KEYS = {
+    "_background_image",
+    "_background_slideshow_gallery",
+    "_background_hover_image",
+    "_background_hover_slideshow_gallery",
+    "background_image",
+    "background_slideshow_gallery",
+    "background_hover_image",
+    "background_hover_slideshow_gallery",
+    "background_overlay_image",
+    "background_overlay_slideshow_gallery",
+    "background_overlay_hover_image",
+    "background_overlay_hover_slideshow_gallery",
+    "button_background_hover_slideshow_gallery",
+    "selected_icon",
+}
+
+
 def load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def is_empty_importer_default(value: Any) -> bool:
+    if value is None or value == "":
+        return True
+    if isinstance(value, list):
+        return not value
+    if isinstance(value, dict):
+        return all(is_empty_importer_default(child) for child in value.values())
+    return False
+
+
+def normalize_settings(value: Any) -> Any:
+    # Elementor can convert an empty settings array into an object containing
+    # only empty control defaults. Canonicalize the empty container to {}.
+    if value == []:
+        return {}
+    if not isinstance(value, dict):
+        return normalize(value)
+
+    result: Dict[str, Any] = {}
+    for key, child in value.items():
+        if key in EMPTY_IMPORTER_DEFAULT_SETTING_KEYS and is_empty_importer_default(child):
+            continue
+        result[key] = normalize(child)
+    return result
 
 
 def normalize(value: Any) -> Any:
@@ -21,6 +69,8 @@ def normalize(value: Any) -> Any:
         for key, child in value.items():
             if is_element and key == "id":
                 result[key] = "<volatile-element-id>"
+            elif is_element and key == "settings":
+                result[key] = normalize_settings(child)
             else:
                 result[key] = normalize(child)
 
@@ -81,11 +131,11 @@ def compare(source: Dict[str, Any], imported: Dict[str, Any]) -> Dict[str, Any]:
 
     walk(source_semantic, imported_semantic, "$")
     return {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "status": "pass" if not differences else "fail",
         "normalization": (
             "Element IDs are volatile; on actual Elementor element objects only, a missing isInner is normalized to false. "
-            "Explicit isInner=true remains significant."
+            "Only explicitly whitelisted empty Template Library control defaults are ignored; non-empty and unknown controls remain strict."
         ),
         "differences": differences,
     }
@@ -102,10 +152,10 @@ def main() -> int:
         source = load_json(args.source)
         imported = load_json(args.imported)
     except (OSError, json.JSONDecodeError) as exc:
-        report = {"schema_version": "1.1", "status": "fail", "differences": [{"path": "$", "reason": "read_error", "message": str(exc)}]}
+        report = {"schema_version": "1.2", "status": "fail", "differences": [{"path": "$", "reason": "read_error", "message": str(exc)}]}
     else:
         if not isinstance(source, dict) or not isinstance(imported, dict):
-            report = {"schema_version": "1.1", "status": "fail", "differences": [{"path": "$", "reason": "invalid_wrapper"}]}
+            report = {"schema_version": "1.2", "status": "fail", "differences": [{"path": "$", "reason": "invalid_wrapper"}]}
         else:
             report = compare(source, imported)
 
