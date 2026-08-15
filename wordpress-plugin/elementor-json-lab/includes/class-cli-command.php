@@ -28,7 +28,7 @@ final class CLI_Command {
 		$template_path = isset( $args[0] ) ? (string) $args[0] : '';
 		$output = isset( $assoc_args['output'] ) ? (string) $assoc_args['output'] : '';
 		if ( '' === $template_path || ! is_readable( $template_path ) || '' === $output ) {
-			\WP_CLI::error( 'import-roundtrip requires a readable template path and --output.' );
+			\WP_CLI::error( 'import_roundtrip requires a readable template path and --output.' );
 			return;
 		}
 		if ( ! method_exists( '\\WP_CLI', 'runcommand' ) ) {
@@ -36,14 +36,35 @@ final class CLI_Command {
 			return;
 		}
 
+		$administrators = get_users(
+			array(
+				'role'    => 'administrator',
+				'number'  => 1,
+				'orderby' => 'ID',
+				'order'   => 'ASC',
+			)
+		);
+		if ( empty( $administrators ) || ! $administrators[0] instanceof \WP_User ) {
+			\WP_CLI::error( 'No administrator user is available for Elementor Library Import capability checks.' );
+			return;
+		}
+		$administrator_id = (int) $administrators[0]->ID;
+		$previous_user_id = get_current_user_id();
+		wp_set_current_user( $administrator_id );
+
 		$before = get_posts( array(
 			'post_type'      => 'elementor_library',
 			'post_status'    => 'any',
 			'posts_per_page' => -1,
 			'fields'         => 'ids',
 		) );
-		$command = 'elementor library import ' . escapeshellarg( $template_path ) . ' --returnType=ids';
+		$command = 'elementor library import ' . escapeshellarg( $template_path ) . ' --returnType=ids --user=' . $administrator_id;
 		$result = \WP_CLI::runcommand( $command, array( 'return' => 'all', 'exit_error' => false, 'launch' => false ) );
+		if ( $previous_user_id ) {
+			wp_set_current_user( $previous_user_id );
+		} else {
+			wp_set_current_user( 0 );
+		}
 		if ( ! is_object( $result ) || ! isset( $result->return_code ) || 0 !== (int) $result->return_code ) {
 			$stderr = is_object( $result ) && isset( $result->stderr ) ? trim( (string) $result->stderr ) : '';
 			\WP_CLI::error( 'Elementor official Library Import failed.' . ( $stderr ? ' ' . $stderr : '' ) );
