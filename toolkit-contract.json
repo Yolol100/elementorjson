@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "owner_skill": "elementor",
+  "project_id": "project-elementor",
+  "repository": "Yolol100/elementorjson",
+  "evidence_role": "controlled_runtime_elementor_json_and_render_validation",
+  "requires_account": false,
+  "requires_api_key": false,
+  "requires_mcp": false,
+  "tools": [
+    {"id":"elementor-json-auditor","version":"repo","trigger_when":"templates are supplied","outputs":["artifacts/static-audit","artifacts/runtime-audit"]},
+    {"id":"deep-json-validator","version":"repo","trigger_when":"templates are supplied","outputs":["deep validation reports"]},
+    {"id":"npm-audit","version":"runner-node","trigger_when":"every runtime preview","outputs":["artifacts/dependency-audit/npm-audit.json"]},
+    {"id":"wp-env","version":"11.11.0","trigger_when":"runtime evidence is required","outputs":["controlled WordPress runtime"]},
+    {"id":"elementor-core","version":"4.2.2","trigger_when":"runtime evidence is required","outputs":["runtime inventory and imports"]},
+    {"id":"hello-elementor","version":"3.4.9","trigger_when":"runtime evidence is required","outputs":["controlled render baseline"]},
+    {"id":"template-library-import","version":"elementor-cli","trigger_when":"templates are supplied to runtime","outputs":["official import evidence"]},
+    {"id":"semantic-roundtrip","version":"repo","trigger_when":"templates are imported","outputs":["artifacts/roundtrip"]},
+    {"id":"playwright","version":"1.61.1","trigger_when":"rendered runtime evidence is required","outputs":["cross-browser responsive screenshots"]}
+  ],
+  "usage_assertions": [
+    {"tool":"elementor-json-auditor","path":".github/workflows/validate.yml","contains":"audit_elementor_json.py"},
+    {"tool":"deep-json-validator","path":".github/workflows/validate.yml","contains":"validate_elementor_deep.py"},
+    {"tool":"npm-audit","path":".github/workflows/validate.yml","contains":"npm audit --audit-level=high"},
+    {"tool":"wp-env","path":"package.json","contains":"\"@wordpress/env\": \"11.11.0\""},
+    {"tool":"elementor-core","path":".github/workflows/validate.yml","contains":"ELEMENTOR_CORE_VERSION: '4.2.2'"},
+    {"tool":"hello-elementor","path":".github/workflows/validate.yml","contains":"HELLO_ELEMENTOR_VERSION: '3.4.9'"},
+    {"tool":"template-library-import","path":".github/workflows/validate.yml","contains":"elementor library import"},
+    {"tool":"semantic-roundtrip","path":".github/workflows/validate.yml","contains":"compare_elementor_roundtrip.py"},
+    {"tool":"playwright","path":"package.json","contains":"\"@playwright/test\": \"1.61.1\""}
+  ],
+  "boundaries": [
+    "The accountless Free/Core path is complete without Elementor Pro.",
+    "Elementor Pro remains an optional pre-existing secret/license path; this hardening does not add or require a new account, API key or MCP server.",
+    "Controlled runtime evidence does not prove a client staging or production target.",
+    "Accessibility acceptance remains owned by Website QA."
+  ]
+}
