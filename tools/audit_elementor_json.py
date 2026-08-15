@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -102,11 +101,21 @@ def audit(template_path: Path, inventory_path: Optional[Path]) -> Dict[str, Any]
 
     inventory: Dict[str, Any] = {}
     inventory_environment: Dict[str, Any] = {}
+    inventory_supplied = False
+
     if inventory_path:
         try:
             inventory_doc = load_json(inventory_path)
-            inventory = inventory_doc.get("widgets", {}) if isinstance(inventory_doc, dict) else {}
-            inventory_environment = inventory_doc.get("environment", {}) if isinstance(inventory_doc, dict) else {}
+            if not isinstance(inventory_doc, dict) or not isinstance(inventory_doc.get("widgets"), dict):
+                warnings.append({
+                    "code": "invalid_inventory_shape",
+                    "message": "Inventory must be an object containing a widgets object.",
+                    "path": "$",
+                })
+            else:
+                inventory = inventory_doc["widgets"]
+                inventory_environment = inventory_doc.get("environment", {}) if isinstance(inventory_doc.get("environment"), dict) else {}
+                inventory_supplied = True
         except (OSError, json.JSONDecodeError) as exc:
             warnings.append({
                 "code": "inventory_unreadable",
@@ -234,14 +243,14 @@ def audit(template_path: Path, inventory_path: Optional[Path]) -> Dict[str, Any]
                 widget_counts[widget_type] += 1
                 widget_settings[widget_type].update(str(key) for key in settings_dict.keys())
 
-                runtime_widget = inventory.get(widget_type) if isinstance(inventory, dict) else None
+                runtime_widget = inventory.get(widget_type) if inventory_supplied else None
                 available = isinstance(runtime_widget, dict)
                 finding = widget_findings.setdefault(
                     widget_type,
                     {
                         "widget_type": widget_type,
                         "count": 0,
-                        "available": available if inventory else None,
+                        "available": available if inventory_supplied else None,
                         "owner": classify_owner(runtime_widget) if available else {
                             "owner": "unknown",
                             "plugin_slug": None,
@@ -253,7 +262,7 @@ def audit(template_path: Path, inventory_path: Optional[Path]) -> Dict[str, Any]
                 )
                 finding["count"] += 1
 
-                if inventory and not available:
+                if inventory_supplied and not available:
                     errors.append({
                         "code": "missing_widget_dependency",
                         "message": f"widgetType '{widget_type}' is not registered in the supplied runtime inventory.",
