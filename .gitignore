@@ -1,7 +1,25 @@
+# Node / WordPress runtime / Playwright
 node_modules/
 .wp-env/
-artifacts/
 playwright-report/
 test-results/
+
+# Generated QA output
+artifacts/
 wordpress-plugin/elementor-json-lab/.runtime/
+
+# Local credentials and environment files
+.env
+.env.*
+!.env.example
+auth.json
+composer-auth.json
+*.log
+
+# Real target inventory can expose client/plugin/version details.
+# This public repository may only contain deliberately sanitized target fixtures.
+target/inventory.json
+
+# OS/editor noise
 .DS_Store
+Thumbs.db
