@@ -68,6 +68,27 @@ class DeepValidationTests(unittest.TestCase):
         self.assertEqual("fail", report["status"])
         self.assertTrue(any(item["code"] == "atomic_missing_version" for item in report["errors"]))
 
+    def test_source_missing_is_inner_stays_strict(self):
+        template = copy.deepcopy(ATOMIC_TEMPLATE)
+        del template["content"][0]["elements"][0]["isInner"]
+        report = validate_document(template)
+        self.assertEqual("fail", report["status"])
+        self.assertTrue(any(item["code"] == "atomic_invalid_is_inner" for item in report["errors"]))
+
+    def test_importer_default_can_omit_false_is_inner(self):
+        template = copy.deepcopy(ATOMIC_TEMPLATE)
+        del template["content"][0]["elements"][0]["isInner"]
+        report = validate_document(template, allow_importer_defaults=True)
+        self.assertEqual("pass", report["status"])
+        self.assertTrue(report["allow_importer_defaults"])
+
+    def test_importer_default_does_not_allow_invalid_is_inner_type(self):
+        template = copy.deepcopy(ATOMIC_TEMPLATE)
+        template["content"][0]["elements"][0]["isInner"] = "false"
+        report = validate_document(template, allow_importer_defaults=True)
+        self.assertEqual("fail", report["status"])
+        self.assertTrue(any(item["code"] == "atomic_invalid_is_inner" for item in report["errors"]))
+
     def test_atomic_untyped_setting_fails(self):
         template = copy.deepcopy(ATOMIC_TEMPLATE)
         template["content"][0]["elements"][0]["settings"]["tag"] = "h3"
