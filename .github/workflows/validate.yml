@@ -139,10 +139,10 @@ jobs:
       - name: Prepare artifact directories
         run: mkdir -p artifacts/dependency-audit artifacts/runtime-audit artifacts/roundtrip artifacts/screenshots
 
-      - name: Install test tooling
-        run: npm install --no-fund
+      - name: Install locked test tooling
+        run: npm ci --no-fund
 
-      - name: Capture generated npm lockfile
+      - name: Capture committed npm lockfile
         shell: bash
         run: |
           set -euo pipefail
