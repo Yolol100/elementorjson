@@ -1,4 +1,4 @@
-name: Diagnose Elementor import once
+name: Diagnose Elementor import and roundtrip once
 
 on:
   push:
@@ -18,6 +18,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
       - name: Set up Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -27,7 +31,7 @@ jobs:
         run: npm ci --no-fund
       - name: Prepare template mount
         run: |
-          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/templates
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/{templates,roundtrip}
           cp templates/smoke-heading.json wordpress-plugin/elementor-json-lab/.runtime/templates/
       - name: Start pinned runtime
         run: npx wp-env start
@@ -37,25 +41,31 @@ jobs:
           npx wp-env run cli wp plugin install elementor --version=4.2.2 --activate
           npx wp-env run cli wp plugin activate elementor-json-lab
           npx wp-env run cli wp theme install hello-elementor --version=3.4.9 --activate
-      - name: Show runtime and Elementor CLI help
-        run: |
-          set -euxo pipefail
-          npx wp-env run cli wp user list --role=administrator --fields=ID,user_login,roles --format=table
-          npx wp-env run cli wp elementor library import --help || true
-          npx wp-env run cli wp eval 'echo is_readable("/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/smoke-heading.json") ? "readable\n" : "not-readable\n";'
-      - name: Run official import as discovered admin
+      - name: Import, save, re-export and compare
         shell: bash
         run: |
-          set -uxo pipefail
+          set -euxo pipefail
           admin_id="$(npx wp-env run cli wp user list --role=administrator --field=ID | grep -E '^[0-9]+$' | head -n1)"
-          echo "ADMIN_ID=$admin_id"
-          set +e
+          before="$(npx wp-env run cli wp post list --post_type=elementor_library --post_status=any --field=ID | grep -E '^[0-9]+$' | sort -n | tr '\n' ' ')"
           npx wp-env run cli wp --user="$admin_id" elementor library import "/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/smoke-heading.json" --returnType=ids
-          rc=$?
-          set -e
-          echo "IMPORT_EXIT=$rc"
-          npx wp-env run cli wp post list --post_type=elementor_library --post_status=any --fields=ID,post_title,post_status --format=table || true
-          exit "$rc"
+          after="$(npx wp-env run cli wp post list --post_type=elementor_library --post_status=any --field=ID | grep -E '^[0-9]+$' | sort -n | tr '\n' ' ')"
+          printf 'BEFORE=%s\nAFTER=%s\n' "$before" "$after"
+          post_id="$(python - "$before" "$after" <<'PY'
+          import sys
+          before = {int(x) for x in sys.argv[1].split()}
+          after = {int(x) for x in sys.argv[2].split()}
+          new = sorted(after - before)
+          if len(new) != 1:
+              raise SystemExit(f'Expected exactly one imported Library ID, got {new}')
+          print(new[0])
+          PY
+          )"
+          echo "IMPORTED_ID=$post_id"
+          npx wp-env run cli wp ejl roundtrip "$post_id" --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/roundtrip/smoke-heading.json
+          echo '--- ROUNDTRIP JSON ---'
+          cat wordpress-plugin/elementor-json-lab/.runtime/roundtrip/smoke-heading.json
+          echo '--- STRICT COMPARE ---'
+          python tools/compare_elementor_roundtrip.py templates/smoke-heading.json wordpress-plugin/elementor-json-lab/.runtime/roundtrip/smoke-heading.json
       - name: Stop runtime
         if: always()
         run: npx wp-env stop
