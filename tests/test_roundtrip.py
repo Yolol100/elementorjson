@@ -37,6 +37,7 @@ class RoundtripTests(unittest.TestCase):
         report = self._compare(source, reexport)
         self.assertEqual("pass", report["status"])
         self.assertTrue(report["semantic_equal"])
+        self.assertEqual(["element.id"], report["ignored_fields"])
 
     def test_semantic_setting_change_fails(self):
         source = {
@@ -57,6 +58,47 @@ class RoundtripTests(unittest.TestCase):
         self.assertEqual("fail", report["status"])
         self.assertFalse(report["semantic_equal"])
         self.assertTrue(report["diff"])
+
+    def test_setting_id_is_not_ignored(self):
+        source = {
+            "page_settings": [],
+            "content": [{
+                "id": "source-element", "elType": "widget", "widgetType": "button",
+                "settings": {"link": {"id": "target-123", "url": "/expected"}}, "elements": []
+            }],
+        }
+        reexport = {
+            "page_settings": [],
+            "content": [{
+                "id": "new-element", "elType": "widget", "widgetType": "button",
+                "settings": {"link": {"id": "target-999", "url": "/expected"}}, "elements": []
+            }],
+        }
+        report = self._compare(source, reexport)
+        self.assertEqual("fail", report["status"])
+        self.assertFalse(report["semantic_equal"])
+        self.assertTrue(any("target-123" in line or "target-999" in line for line in report["diff"]))
+
+    def test_style_id_is_not_ignored(self):
+        source = {
+            "page_settings": [],
+            "content": [{
+                "id": "source-element", "elType": "e-div-block", "version": "0.0",
+                "isInner": False, "settings": [], "editor_settings": [], "interactions": [],
+                "styles": [{"id": "style-a", "variants": []}], "elements": []
+            }],
+        }
+        reexport = {
+            "page_settings": [],
+            "content": [{
+                "id": "new-element", "elType": "e-div-block", "version": "0.0",
+                "isInner": False, "settings": [], "editor_settings": [], "interactions": [],
+                "styles": [{"id": "style-b", "variants": []}], "elements": []
+            }],
+        }
+        report = self._compare(source, reexport)
+        self.assertEqual("fail", report["status"])
+        self.assertFalse(report["semantic_equal"])
 
     def test_missing_content_fails_closed(self):
         report = self._compare({"page_settings": []}, {"page_settings": [], "content": []})
