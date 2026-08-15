@@ -1,10 +1,6 @@
 {
   "plugins": [
-    "./wordpress-plugin/elementor-json-lab",
-    "https://downloads.wordpress.org/plugin/elementor.latest-stable.zip"
-  ],
-  "themes": [
-    "https://downloads.wordpress.org/theme/hello-elementor.latest-stable.zip"
+    "./wordpress-plugin/elementor-json-lab"
   ],
   "config": {
     "WP_DEBUG": true,
