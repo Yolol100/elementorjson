@@ -141,12 +141,8 @@ final class CLI_Command {
 	}
 
 	/**
-	 * Re-export the Elementor data stored for an imported Template Library item.
-	 *
-	 * This command intentionally reads the post created by Elementor's official
-	 * `wp elementor library import` command. It does not replace the importer; it
-	 * exposes the imported data so the CI harness can perform a semantic
-	 * source-versus-import roundtrip comparison.
+	 * Read an imported Template Library item back through Elementor's local
+	 * template source API for semantic roundtrip comparison.
 	 *
 	 * ## OPTIONS
 	 *
@@ -164,17 +160,35 @@ final class CLI_Command {
 			return;
 		}
 
-		$raw_content = get_post_meta( $post_id, '_elementor_data', true );
-		$content     = is_string( $raw_content ) ? json_decode( $raw_content, true ) : null;
-		if ( ! is_array( $content ) && is_string( $raw_content ) ) {
-			$content = json_decode( wp_unslash( $raw_content ), true );
-		}
-		if ( ! is_array( $content ) ) {
-			\WP_CLI::error( 'Imported template does not contain readable _elementor_data JSON.' );
+		if ( ! class_exists( '\\Elementor\\Plugin' ) ) {
+			\WP_CLI::error( 'Elementor is not loaded.' );
 			return;
 		}
 
-		$page_settings = get_post_meta( $post_id, '_elementor_page_settings', true );
+		$elementor = \Elementor\Plugin::instance();
+		if ( ! isset( $elementor->templates_manager ) || ! method_exists( $elementor->templates_manager, 'get_source' ) ) {
+			\WP_CLI::error( 'Elementor template manager is unavailable.' );
+			return;
+		}
+
+		$local_source = $elementor->templates_manager->get_source( 'local' );
+		if ( ! is_object( $local_source ) || ! method_exists( $local_source, 'get_data' ) ) {
+			\WP_CLI::error( 'Elementor local template source is unavailable.' );
+			return;
+		}
+
+		$source_data = $local_source->get_data(
+			array(
+				'template_id'        => $post_id,
+				'with_page_settings' => true,
+			)
+		);
+		$content = $source_data['content'] ?? null;
+		if ( ! is_array( $content ) ) {
+			\WP_CLI::error( 'Elementor local source did not return a content array.' );
+			return;
+		}
+		$page_settings = $source_data['page_settings'] ?? array();
 		if ( ! is_array( $page_settings ) ) {
 			$page_settings = array();
 		}
@@ -189,7 +203,7 @@ final class CLI_Command {
 			'_qa'           => array(
 				'imported_post_id' => $post_id,
 				'elementor_version' => defined( 'ELEMENTOR_VERSION' ) ? ELEMENTOR_VERSION : null,
-				'source'            => 'elementor-library-import-postmeta-readback',
+				'source'            => 'elementor-local-source-get-data',
 			),
 		);
 
