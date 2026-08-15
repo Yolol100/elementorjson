@@ -21,31 +21,7 @@ final class CLI_Command {
 			return;
 		}
 
-		$json = wp_json_encode( $inventory, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-		if ( false === $json ) {
-			\WP_CLI::error( 'Could not encode the widget inventory.' );
-			return;
-		}
-
-		if ( ! empty( $assoc_args['output'] ) ) {
-			$path = (string) $assoc_args['output'];
-			$dir  = dirname( $path );
-
-			if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
-				\WP_CLI::error( 'Could not create the output directory.' );
-				return;
-			}
-
-			if ( false === file_put_contents( $path, $json . PHP_EOL ) ) {
-				\WP_CLI::error( 'Could not write the widget inventory.' );
-				return;
-			}
-
-			\WP_CLI::success( sprintf( 'Inventory written to %s', $path ) );
-			return;
-		}
-
-		\WP_CLI::line( $json );
+		$this->emit_json( $inventory, isset( $assoc_args['output'] ) ? (string) $assoc_args['output'] : '' );
 	}
 
 	/**
@@ -154,23 +130,109 @@ final class CLI_Command {
 			'url'           => $url,
 			'page_template' => $page_template,
 			'source'        => basename( $template_path ),
+			'mode'          => 'direct-postmeta-preview',
 		);
 
 		if ( ! empty( $assoc_args['output'] ) ) {
-			$output = (string) $assoc_args['output'];
-			$dir    = dirname( $output );
-			if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
-				\WP_CLI::error( 'Could not create the render manifest directory.' );
-				return;
-			}
-
-			$json = wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-			if ( false === $json || false === file_put_contents( $output, $json . PHP_EOL ) ) {
-				\WP_CLI::error( 'Could not write the render manifest.' );
-				return;
-			}
+			$this->emit_json( $manifest, (string) $assoc_args['output'], false );
 		}
 
 		\WP_CLI::success( sprintf( 'Rendered %s at %s', basename( $template_path ), $url ) );
+	}
+
+	/**
+	 * Read an imported Template Library item back through Elementor's local
+	 * template source API for semantic roundtrip comparison.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <post-id>
+	 * : Imported elementor_library post ID.
+	 *
+	 * [--output=<path>]
+	 * : Write JSON to a file instead of stdout.
+	 */
+	public function export_template( array $args, array $assoc_args ): void {
+		$post_id = isset( $args[0] ) ? absint( $args[0] ) : 0;
+		$post    = $post_id ? get_post( $post_id ) : null;
+		if ( ! $post instanceof \WP_Post || 'elementor_library' !== $post->post_type ) {
+			\WP_CLI::error( 'A valid imported elementor_library post ID is required.' );
+			return;
+		}
+
+		if ( ! class_exists( '\\Elementor\\Plugin' ) ) {
+			\WP_CLI::error( 'Elementor is not loaded.' );
+			return;
+		}
+
+		$elementor = \Elementor\Plugin::instance();
+		if ( ! isset( $elementor->templates_manager ) || ! method_exists( $elementor->templates_manager, 'get_source' ) ) {
+			\WP_CLI::error( 'Elementor template manager is unavailable.' );
+			return;
+		}
+
+		$local_source = $elementor->templates_manager->get_source( 'local' );
+		if ( ! is_object( $local_source ) || ! method_exists( $local_source, 'get_data' ) ) {
+			\WP_CLI::error( 'Elementor local template source is unavailable.' );
+			return;
+		}
+
+		$source_data = $local_source->get_data(
+			array(
+				'template_id'        => $post_id,
+				'with_page_settings' => true,
+			)
+		);
+		$content = $source_data['content'] ?? null;
+		if ( ! is_array( $content ) ) {
+			\WP_CLI::error( 'Elementor local source did not return a content array.' );
+			return;
+		}
+		$page_settings = $source_data['page_settings'] ?? array();
+		if ( ! is_array( $page_settings ) ) {
+			$page_settings = array();
+		}
+		$template_type = (string) get_post_meta( $post_id, '_elementor_template_type', true );
+
+		$document = array(
+			'title'         => $post->post_title,
+			'type'          => $template_type ?: 'page',
+			'version'       => '0.4',
+			'page_settings' => $page_settings,
+			'content'       => $content,
+			'_qa'           => array(
+				'imported_post_id' => $post_id,
+				'elementor_version' => defined( 'ELEMENTOR_VERSION' ) ? ELEMENTOR_VERSION : null,
+				'source'            => 'elementor-local-source-get-data',
+			),
+		);
+
+		$this->emit_json( $document, isset( $assoc_args['output'] ) ? (string) $assoc_args['output'] : '' );
+	}
+
+	private function emit_json( array $data, string $output = '', bool $success_message = true ): void {
+		$json = wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		if ( false === $json ) {
+			\WP_CLI::error( 'Could not encode JSON output.' );
+			return;
+		}
+
+		if ( '' === $output ) {
+			\WP_CLI::line( $json );
+			return;
+		}
+
+		$dir = dirname( $output );
+		if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
+			\WP_CLI::error( 'Could not create the output directory.' );
+			return;
+		}
+		if ( false === file_put_contents( $output, $json . PHP_EOL ) ) {
+			\WP_CLI::error( 'Could not write JSON output.' );
+			return;
+		}
+		if ( $success_message ) {
+			\WP_CLI::success( sprintf( 'JSON written to %s', $output ) );
+		}
 	}
 }
