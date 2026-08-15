@@ -23,7 +23,7 @@ A green run is **controlled_runtime** evidence. It can prove the pinned disposab
 
 ## Pinned runtime
 
-See `runtime-versions.json`. CI fails if the observed WordPress, PHP, Elementor Core or Hello versions drift from those pins. Node dependencies are exact and locked with `package-lock.json`; CI uses `npm ci` and `npm audit --audit-level=high`.
+See `runtime-versions.json`. CI fails if the observed WordPress, PHP, Elementor Core or Hello versions drift from those pins. Node dependencies are exact and locked with `package-lock.json`; CI uses `npm ci` and `npm audit --audit-level=high`. The lockfile also forces the patched `adm-zip` 0.6.0 release so the known pre-0.6.0 ZIP memory-allocation vulnerability cannot re-enter through the pinned wp-env dependency tree.
 
 ## Elementor Pro
 
