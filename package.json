@@ -1,0 +1,15 @@
+{
+  "name": "elementor-json-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Elementor JSON validation and visual preview pipeline",
+  "scripts": {
+    "wp:start": "wp-env start",
+    "wp:stop": "wp-env stop",
+    "test:visual": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@wordpress/env": "11.11.0"
+  }
+}
