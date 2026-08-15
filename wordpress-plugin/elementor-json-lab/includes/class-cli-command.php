@@ -16,9 +16,79 @@ final class CLI_Command {
 	}
 
 	/**
-	 * Reopen an officially imported Elementor Library document, save it through Elementor and export its stored data.
+	 * Import one JSON template through Elementor's official Library Import CLI, then reopen/save/re-export it.
 	 *
-	 * Import itself must be performed with Elementor's official `wp elementor library import` CLI command.
+	 * ## OPTIONS
+	 * <template>
+	 * : Absolute JSON path.
+	 * --output=<path>
+	 * : Roundtrip JSON destination.
+	 */
+	public function import_roundtrip( array $args, array $assoc_args ): void {
+		$template_path = isset( $args[0] ) ? (string) $args[0] : '';
+		$output = isset( $assoc_args['output'] ) ? (string) $assoc_args['output'] : '';
+		if ( '' === $template_path || ! is_readable( $template_path ) || '' === $output ) {
+			\WP_CLI::error( 'import_roundtrip requires a readable template path and --output.' );
+			return;
+		}
+		if ( ! method_exists( '\\WP_CLI', 'runcommand' ) ) {
+			\WP_CLI::error( 'WP-CLI runcommand is unavailable.' );
+			return;
+		}
+
+		$administrators = get_users(
+			array(
+				'role'    => 'administrator',
+				'number'  => 1,
+				'orderby' => 'ID',
+				'order'   => 'ASC',
+			)
+		);
+		if ( empty( $administrators ) || ! $administrators[0] instanceof \WP_User ) {
+			\WP_CLI::error( 'No administrator user is available for Elementor Library Import capability checks.' );
+			return;
+		}
+		$administrator_id = (int) $administrators[0]->ID;
+
+		$before = get_posts( array(
+			'post_type'      => 'elementor_library',
+			'post_status'    => 'any',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+		) );
+		$command = 'elementor library import ' . escapeshellarg( $template_path ) . ' --returnType=ids --user=' . $administrator_id;
+		$result = \WP_CLI::runcommand(
+			$command,
+			array(
+				'return'     => 'all',
+				'exit_error' => false,
+				'launch'     => true,
+			)
+		);
+		if ( ! is_object( $result ) || ! isset( $result->return_code ) || 0 !== (int) $result->return_code ) {
+			$stderr = is_object( $result ) && isset( $result->stderr ) ? trim( (string) $result->stderr ) : '';
+			\WP_CLI::error( 'Elementor official Library Import failed.' . ( $stderr ? ' ' . $stderr : '' ) );
+			return;
+		}
+
+		$after = get_posts( array(
+			'post_type'      => 'elementor_library',
+			'post_status'    => 'any',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+		) );
+		$new_ids = array_values( array_diff( array_map( 'intval', $after ), array_map( 'intval', $before ) ) );
+		if ( 1 !== count( $new_ids ) ) {
+			\WP_CLI::error( sprintf( 'Expected exactly one new Elementor Library document, found %d.', count( $new_ids ) ) );
+			return;
+		}
+
+		$this->export_roundtrip( (int) $new_ids[0], $output );
+		\WP_CLI::success( sprintf( 'Official import + Elementor save + roundtrip export passed for Library template %d.', (int) $new_ids[0] ) );
+	}
+
+	/**
+	 * Reopen an officially imported Elementor Library document, save it through Elementor and export its stored data.
 	 *
 	 * ## OPTIONS
 	 * <post-id>
