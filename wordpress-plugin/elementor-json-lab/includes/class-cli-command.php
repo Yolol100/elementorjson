@@ -29,23 +29,98 @@ final class CLI_Command {
 
 		if ( ! empty( $assoc_args['output'] ) ) {
 			$path = (string) $assoc_args['output'];
-			$dir  = dirname( $path );
-
-			if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
-				\WP_CLI::error( 'Could not create the output directory.' );
+			if ( ! $this->write_json( $path, $json ) ) {
 				return;
 			}
-
-			if ( false === file_put_contents( $path, $json . PHP_EOL ) ) {
-				\WP_CLI::error( 'Could not write the widget inventory.' );
-				return;
-			}
-
 			\WP_CLI::success( sprintf( 'Inventory written to %s', $path ) );
 			return;
 		}
 
 		\WP_CLI::line( $json );
+	}
+
+	/**
+	 * Export the newest Elementor Template Library item after an official importer run.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --output=<path>
+	 * : Destination JSON path.
+	 *
+	 * [--source-template=<path>]
+	 * : Optional original template used only to preserve wrapper title/type/version.
+	 */
+	public function export_library( array $args, array $assoc_args ): void {
+		$output = isset( $assoc_args['output'] ) ? (string) $assoc_args['output'] : '';
+		if ( '' === $output ) {
+			\WP_CLI::error( '--output is required.' );
+			return;
+		}
+
+		$posts = get_posts(
+			array(
+				'post_type'      => 'elementor_library',
+				'post_status'    => 'any',
+				'posts_per_page' => 1,
+				'orderby'        => 'ID',
+				'order'          => 'DESC',
+			)
+		);
+		if ( empty( $posts ) || ! $posts[0] instanceof \WP_Post ) {
+			\WP_CLI::error( 'No Elementor Template Library item was found.' );
+			return;
+		}
+
+		$post = $posts[0];
+		$raw  = get_post_meta( $post->ID, '_elementor_data', true );
+		if ( is_array( $raw ) ) {
+			$content = $raw;
+		} elseif ( is_string( $raw ) && '' !== $raw ) {
+			$content = json_decode( $raw, true );
+		} else {
+			$content = null;
+		}
+
+		if ( ! is_array( $content ) || JSON_ERROR_NONE !== json_last_error() ) {
+			\WP_CLI::error( 'The newest library item does not contain valid Elementor data.' );
+			return;
+		}
+
+		$source = array();
+		if ( ! empty( $assoc_args['source-template'] ) ) {
+			$source_path = (string) $assoc_args['source-template'];
+			if ( ! is_readable( $source_path ) ) {
+				\WP_CLI::error( 'The source template is unreadable.' );
+				return;
+			}
+			$source_raw = file_get_contents( $source_path );
+			$source     = false !== $source_raw ? json_decode( $source_raw, true ) : null;
+			if ( ! is_array( $source ) || JSON_ERROR_NONE !== json_last_error() ) {
+				\WP_CLI::error( 'The source template is not valid JSON.' );
+				return;
+			}
+		}
+
+		$page_settings = get_post_meta( $post->ID, '_elementor_page_settings', true );
+		if ( ! is_array( $page_settings ) ) {
+			$page_settings = array();
+		}
+
+		$template_type = get_post_meta( $post->ID, '_elementor_template_type', true );
+		$document      = array(
+			'title'         => isset( $source['title'] ) ? (string) $source['title'] : get_the_title( $post ),
+			'type'          => isset( $source['type'] ) ? (string) $source['type'] : ( $template_type ? (string) $template_type : 'page' ),
+			'version'       => isset( $source['version'] ) ? (string) $source['version'] : '0.4',
+			'page_settings' => $page_settings,
+			'content'       => $content,
+		);
+
+		$json = wp_json_encode( $document, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		if ( false === $json || ! $this->write_json( $output, $json ) ) {
+			return;
+		}
+
+		\WP_CLI::success( sprintf( 'Exported library item %d to %s', (int) $post->ID, $output ) );
 	}
 
 	/**
@@ -157,20 +232,25 @@ final class CLI_Command {
 		);
 
 		if ( ! empty( $assoc_args['output'] ) ) {
-			$output = (string) $assoc_args['output'];
-			$dir    = dirname( $output );
-			if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
-				\WP_CLI::error( 'Could not create the render manifest directory.' );
-				return;
-			}
-
 			$json = wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-			if ( false === $json || false === file_put_contents( $output, $json . PHP_EOL ) ) {
-				\WP_CLI::error( 'Could not write the render manifest.' );
+			if ( false === $json || ! $this->write_json( (string) $assoc_args['output'], $json ) ) {
 				return;
 			}
 		}
 
 		\WP_CLI::success( sprintf( 'Rendered %s at %s', basename( $template_path ), $url ) );
+	}
+
+	private function write_json( string $path, string $json ): bool {
+		$dir = dirname( $path );
+		if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
+			\WP_CLI::error( sprintf( 'Could not create output directory for %s', $path ) );
+			return false;
+		}
+		if ( false === file_put_contents( $path, $json . PHP_EOL ) ) {
+			\WP_CLI::error( sprintf( 'Could not write %s', $path ) );
+			return false;
+		}
+		return true;
 	}
 }

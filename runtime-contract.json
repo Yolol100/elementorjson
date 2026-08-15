@@ -1,10 +1,10 @@
 {
-  "contract_version": "1.1",
+  "contract_version": "1.2",
   "repository": "Yolol100/elementorjson",
   "default_branch": "main",
   "workflow": ".github/workflows/validate.yml",
   "role": "controlled_runtime",
-  "purpose": "Turn Elementor JSON source evidence into reproducible WordPress/Elementor runtime evidence with widget inventory, render checks and responsive screenshots.",
+  "purpose": "Turn Elementor JSON source evidence into reproducible WordPress/Elementor controlled-runtime evidence with source validation, official Template Library import, semantic importer roundtrip, registered widget inventory and cross-browser responsive rendering.",
   "caller": {
     "project": "project-elementor",
     "domain_owner": "elementor",
@@ -19,10 +19,10 @@
       "new or screenshot-reconstructed Elementor JSON needs a runtime or visual claim",
       "existing Elementor JSON changes structure, widgets, widget settings, responsive behavior or dependencies",
       "the user asks to test, scan, render, preview, screenshot, verify widgets, verify Pro or check import behavior",
-      "source-valid JSON is about to be described as runtime-valid or visually correct"
+      "source-valid JSON is about to be described as runtime-valid, importer-valid or visually correct"
     ],
     "optional_when": [
-      "the task is a source-only audit or planning task and no runtime or visual claim is needed"
+      "the task is a source-only audit or planning task and no runtime, importer or visual claim is needed"
     ],
     "forbidden_when": [
       "input contains secrets, credentials, personal data or client-confidential content while this repository is public",
@@ -31,11 +31,14 @@
     ]
   },
   "why": [
+    "detect malformed Classic or Atomic Elementor structures before import",
     "detect missing or unavailable Elementor widgets before target import",
-    "check the JSON against widgets and controls registered by a real Elementor runtime",
-    "prove that WordPress and Elementor can render the supplied template in a disposable environment",
-    "produce desktop, tablet and mobile screenshots for visual iteration",
-    "separate source-only confidence from controlled-runtime evidence"
+    "check JSON against widgets and controls registered by a real Elementor runtime",
+    "exercise Elementor's documented Template Library importer instead of treating direct postmeta writes as import proof",
+    "detect semantic importer drift while ignoring only volatile Elementor element IDs",
+    "prove that WordPress and Elementor can render the importer-produced template data in a disposable environment",
+    "produce Chromium, Firefox and WebKit evidence at desktop, tablet and mobile viewports",
+    "separate source-only, controlled-runtime and target evidence"
   ],
   "activation": {
     "before_run": [
@@ -43,7 +46,7 @@
       "classify editor family, dependency mode, target objects and risk with the Elementor skill",
       "sanitize public-repository inputs and keep secrets outside committed files",
       "write or update the canonical test JSON under templates/",
-      "optionally provide target/inventory.json only from a controlled target export"
+      "optionally provide target/inventory.json only when it is sanitized and safe for this public repository"
     ],
     "run": [
       "let the Elementor JSON QA workflow start from the main change or workflow_dispatch",
@@ -51,39 +54,55 @@
     ],
     "readback": [
       "read static-audit and elementor-runtime-qa artifacts",
-      "check runtime inventory, runtime audit, render manifests and Elementor Pro status",
-      "inspect desktop, tablet and mobile screenshots before making a visual claim",
-      "record open target/staging tests separately"
+      "check dependency audit, runtime inventory, source/runtime/deep audits, importer roundtrip reports, render manifests and Elementor Pro status",
+      "inspect Chromium, Firefox and WebKit desktop/tablet/mobile screenshot metadata before making a browser claim",
+      "record open target, editor reopen/save/re-export, accessibility and staging tests separately"
     ],
     "iterate": [
-      "on a confirmed source/dependency/render defect, repair the canonical JSON and rerun",
+      "on a confirmed source, dependency, importer, roundtrip or render defect, repair the canonical source and rerun",
       "on a visual mismatch, edit the canonical JSON and compare the next screenshots",
       "never convert controlled-runtime success into target_verified or production_observed without later evidence"
     ]
   },
   "inputs": {
     "templates": "templates/*.json",
-    "target_inventory": "target/inventory.json (optional; exported from a controlled target installation)",
+    "target_inventory": "target/inventory.json (optional and only when sanitized for a public repository; confidential inventories require a private controlled runtime)",
     "elementor_pro_secret": "ELEMENTOR_PRO_LICENSE_KEY (optional GitHub Actions secret; never commit the value)",
     "reference_visual": "kept outside this public repository when confidential; used by the calling assistant for comparison"
   },
+  "baseline": {
+    "wordpress": "7.0.2",
+    "php_series": "8.3",
+    "elementor_core": "4.2.2",
+    "hello_elementor": "3.4.9",
+    "node": "22",
+    "dependency_policy": "direct npm versions are exact; npm audit blocks high/critical findings; a committed npm lockfile remains required for a fully immutable npm dependency graph"
+  },
   "pipeline": [
     "validate this runtime contract",
-    "run source-level Elementor JSON audit",
-    "start disposable WordPress with wp-env",
-    "install and activate Elementor Core and Hello Elementor",
+    "run source-level classic/widget auditor and deep Classic/Atomic structural validator",
+    "run validator and semantic-roundtrip unit tests",
+    "audit npm dependencies and fail on high/critical findings",
+    "start pinned disposable WordPress/PHP with wp-env",
+    "install pinned Elementor Core and Hello Elementor",
     "optionally install and activate Elementor Pro from Elementor's official Composer repository",
-    "export the registered Elementor widget and control inventory",
-    "audit every template against the runtime and optional target inventory",
-    "render every valid template into an isolated Elementor Canvas page",
-    "capture desktop, tablet and mobile screenshots with Playwright",
-    "upload audit reports, runtime inventory, render manifests, Pro status and screenshots as workflow artifacts",
+    "export the registered Elementor widget and control inventory and verify pinned runtime versions",
+    "audit every source template against the runtime and optional sanitized target inventory",
+    "import every source template through wp elementor library import",
+    "export the newest imported library item's semantic document data and compare it against source while ignoring only volatile element IDs",
+    "audit the importer-produced JSON again",
+    "render importer-produced JSON into isolated Elementor Canvas pages",
+    "run Chromium, Firefox and WebKit browser checks at desktop, tablet and mobile viewports with reduced-motion, console, request, image and overflow checks",
+    "upload audit reports, importer outputs, runtime inventory, render manifests, Pro status and screenshots as workflow artifacts",
     "deactivate the temporary Pro license when used and destroy the runtime"
   ],
   "outputs": [
     "static-audit",
+    "elementor-runtime-qa/dependency-audit",
     "elementor-runtime-qa/runtime-inventory.json",
     "elementor-runtime-qa/runtime-audit",
+    "elementor-runtime-qa/roundtrip",
+    "elementor-runtime-qa/imported-templates",
     "elementor-runtime-qa/render-manifests",
     "elementor-runtime-qa/elementor-pro-status.json",
     "elementor-runtime-qa/screenshots",
@@ -92,26 +111,32 @@
   "evidence": {
     "level": "controlled_runtime",
     "can_support": [
+      "Classic and documented Atomic source-structure validation within implemented validator scope",
       "runtime widget availability in the disposable environment",
-      "successful disposable WordPress/Elementor render",
-      "responsive screenshot review at the configured viewports"
+      "successful Elementor Template Library importer acceptance",
+      "semantic preservation of content and page_settings across importer storage while ignoring only volatile element IDs",
+      "successful disposable WordPress/Elementor render of importer-produced JSON",
+      "Chromium, Firefox and WebKit checks at the configured desktop, tablet and mobile viewports"
     ],
     "does_not_prove": [
       "exact customer staging compatibility",
       "target_verified status",
+      "editor reopen/save or a target/UI re-export roundtrip",
       "production behavior",
-      "site-specific object IDs or dynamic data",
-      "full accessibility compliance"
+      "site-specific object IDs, target globals, Classes/Variables, conditions or dynamic data",
+      "Elementor Pro behavior when the Pro secret was not present for the run",
+      "pixel-perfect visual equivalence without an approved reference baseline",
+      "full accessibility or assistive-technology compliance"
     ]
   },
   "iteration": {
-    "on_failure": "Repair only confirmed JSON, dependency or render defects; never invent unknown Atomic, Pro, add-on or site-object data; then rerun the same pipeline.",
-    "on_visual_mismatch": "Adjust the canonical JSON, rerun, compare the new screenshots and repeat until the requested visual acceptance is met.",
-    "formal_final_gate": "When Project Elementor requires a formal cleanup, import, release or 10/10 claim, require two identical green final rounds before handoff to staging/QA."
+    "on_failure": "Repair only confirmed JSON, dependency, importer, roundtrip or render defects; never invent unknown Atomic, Pro, add-on or site-object data; then rerun the same pipeline.",
+    "on_visual_mismatch": "Adjust the canonical JSON, rerun and compare new browser artifacts against the approved reference outside the public repository.",
+    "formal_final_gate": "After the last implementation change, require two stable green final rounds for the covered controlled-runtime scope before handoff to staging/QA."
   },
   "privacy": {
     "repository_visibility_assumption": "public",
-    "rule": "Do not commit confidential client JSON, private screenshots, credentials, license keys, personal data or secret URLs. Use a private runtime/repository or sanitized fixtures instead.",
+    "rule": "Do not commit confidential client JSON, private screenshots, credentials, license keys, personal data, secret URLs or confidential target inventories. Use a private runtime/repository or sanitized fixtures instead.",
     "secret_handling": "ELEMENTOR_PRO_LICENSE_KEY must exist only as a GitHub Actions secret and must never be logged or committed."
   },
   "handoff": {

@@ -32,15 +32,35 @@ for (const template of templates) {
   const slug = slugify(template);
 
   for (const viewport of viewports) {
-    test(`${template} - ${viewport.name}`, async ({ page }) => {
+    test(`${template} - ${viewport.name}`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
 
       const browserErrors = [];
       const consoleErrors = [];
+      const failedRequests = [];
+      const badResponses = [];
+
       page.on('pageerror', (error) => browserErrors.push(error.message));
       page.on('console', (message) => {
         if (message.type() === 'error') {
           consoleErrors.push(message.text());
+        }
+      });
+      page.on('requestfailed', (request) => {
+        const url = request.url();
+        if (url.startsWith('http://127.0.0.1:8888/') || url.startsWith('http://localhost:8888/')) {
+          failedRequests.push({ url, failure: request.failure(), resourceType: request.resourceType() });
+        }
+      });
+      page.on('response', (response) => {
+        const url = response.url();
+        if (
+          response.status() >= 400 &&
+          !url.endsWith('/favicon.ico') &&
+          (url.startsWith('http://127.0.0.1:8888/') || url.startsWith('http://localhost:8888/'))
+        ) {
+          badResponses.push({ url, status: response.status() });
         }
       });
 
@@ -54,26 +74,56 @@ for (const template of templates) {
         'Expected the page to contain rendered Elementor markup'
       ).toBeVisible();
 
+      const overflow = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth
+      }));
+      expect(
+        overflow.scrollWidth,
+        `Expected no horizontal page overflow: ${JSON.stringify(overflow)}`
+      ).toBeLessThanOrEqual(overflow.clientWidth + 1);
+
+      const brokenImages = await page.locator('img').evaluateAll((images) =>
+        images
+          .filter((image) => image.complete && image.naturalWidth === 0)
+          .map((image) => image.currentSrc || image.src)
+      );
+      expect(brokenImages, 'Expected no broken rendered images').toEqual([]);
+
+      const focusable = page.locator('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if ((await focusable.count()) > 0) {
+        await page.keyboard.press('Tab');
+        const activeTag = await page.evaluate(() => document.activeElement && document.activeElement.tagName);
+        expect(activeTag, 'Expected keyboard focus to move away from BODY').not.toBe('BODY');
+      }
+
       fs.mkdirSync(screenshotDir, { recursive: true });
+      const projectName = testInfo.project.name;
+      const basename = `${slug}-${projectName}-${viewport.name}`;
 
       await page.screenshot({
-        path: path.join(screenshotDir, `${slug}-${viewport.name}.png`),
+        path: path.join(screenshotDir, `${basename}.png`),
         fullPage: true,
         animations: 'disabled'
       });
 
-      const metadataPath = path.join(screenshotDir, `${slug}-${viewport.name}.json`);
       fs.writeFileSync(
-        metadataPath,
+        path.join(screenshotDir, `${basename}.json`),
         JSON.stringify(
           {
             template,
             slug,
+            browser: projectName,
             viewport,
+            reduced_motion: true,
             url: page.url(),
             title: await page.title(),
             browser_errors: browserErrors,
-            console_errors: consoleErrors
+            console_errors: consoleErrors,
+            failed_requests: failedRequests,
+            bad_responses: badResponses,
+            horizontal_overflow: overflow,
+            broken_images: brokenImages
           },
           null,
           2
@@ -82,6 +132,8 @@ for (const template of templates) {
 
       expect(browserErrors, 'Expected no uncaught browser errors').toEqual([]);
       expect(consoleErrors, 'Expected no browser console errors').toEqual([]);
+      expect(failedRequests, 'Expected no failed same-origin requests').toEqual([]);
+      expect(badResponses, 'Expected no same-origin HTTP 4xx/5xx asset responses').toEqual([]);
     });
   }
 }
