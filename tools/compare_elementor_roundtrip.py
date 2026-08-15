@@ -23,6 +23,12 @@ def normalize(value: Any) -> Any:
                 result[key] = "<volatile-element-id>"
             else:
                 result[key] = normalize(child)
+
+        # Elementor's official Template Library importer can omit an explicit
+        # `isInner: false` on stored child elements. Preserve `true` strictly,
+        # but normalize a missing false/default only on actual element objects.
+        if is_element and "isInner" not in result:
+            result["isInner"] = False
         return result
     return value
 
@@ -75,9 +81,12 @@ def compare(source: Dict[str, Any], imported: Dict[str, Any]) -> Dict[str, Any]:
 
     walk(source_semantic, imported_semantic, "$")
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "status": "pass" if not differences else "fail",
-        "normalization": "only id fields on actual Elementor element objects are treated as volatile",
+        "normalization": (
+            "Element IDs are volatile; on actual Elementor element objects only, a missing isInner is normalized to false. "
+            "Explicit isInner=true remains significant."
+        ),
         "differences": differences,
     }
 
@@ -93,10 +102,10 @@ def main() -> int:
         source = load_json(args.source)
         imported = load_json(args.imported)
     except (OSError, json.JSONDecodeError) as exc:
-        report = {"schema_version": "1.0", "status": "fail", "differences": [{"path": "$", "reason": "read_error", "message": str(exc)}]}
+        report = {"schema_version": "1.1", "status": "fail", "differences": [{"path": "$", "reason": "read_error", "message": str(exc)}]}
     else:
         if not isinstance(source, dict) or not isinstance(imported, dict):
-            report = {"schema_version": "1.0", "status": "fail", "differences": [{"path": "$", "reason": "invalid_wrapper"}]}
+            report = {"schema_version": "1.1", "status": "fail", "differences": [{"path": "$", "reason": "invalid_wrapper"}]}
         else:
             report = compare(source, imported)
 
