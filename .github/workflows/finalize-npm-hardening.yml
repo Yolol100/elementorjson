@@ -1,0 +1,41 @@
+name: Finalize npm hardening
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/finalize-npm-hardening.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: true
+
+      - name: Require committed lockfile and switch CI to npm ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s package-lock.json
+          grep -Fq 'run: npm install --no-fund' .github/workflows/validate.yml
+          sed -i 's/run: npm install --no-fund/run: npm ci --no-fund/' .github/workflows/validate.yml
+          rm -f .github/workflows/bootstrap-lockfile.yml
+          rm -f .github/workflows/finalize-npm-hardening.yml
+          grep -Fq 'run: npm ci --no-fund' .github/workflows/validate.yml
+
+      - name: Commit final hardening state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'elementor-json-lab-bot'
+          git config user.email 'elementor-json-lab-bot@users.noreply.github.com'
+          git add -A .github/workflows package-lock.json
+          git commit -m 'Enforce locked npm installs in CI'
+          git push origin HEAD:main
