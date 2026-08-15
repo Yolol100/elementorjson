@@ -7,19 +7,24 @@ import sys
 from pathlib import Path
 from typing import Any
 
-IGNORED_ELEMENT_KEYS = {"id"}
+IGNORED_ELEMENT_FIELDS = {"id"}
 
 
 def load(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def is_element_object(value: dict[str, Any]) -> bool:
+    return isinstance(value.get("elType"), str) and bool(value.get("elType"))
+
+
 def normalize(value: Any) -> Any:
     if isinstance(value, dict):
+        element_object = is_element_object(value)
         return {
             key: normalize(child)
             for key, child in sorted(value.items())
-            if key not in IGNORED_ELEMENT_KEYS
+            if not (element_object and key in IGNORED_ELEMENT_FIELDS)
         }
     if isinstance(value, list):
         return [normalize(child) for child in value]
@@ -49,20 +54,21 @@ def compare(source: Path, reexport: Path) -> dict[str, Any]:
         actual = canonical_payload(reexport_doc)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         return {
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "status": "fail",
             "source": str(source),
             "reexport": str(reexport),
             "errors": [str(exc)],
         }
 
+    ignored_fields = ["element.id"]
     if expected == actual:
         return {
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "status": "pass",
             "source": str(source),
             "reexport": str(reexport),
-            "ignored_fields": sorted(IGNORED_ELEMENT_KEYS),
+            "ignored_fields": ignored_fields,
             "semantic_equal": True,
             "diff": [],
         }
@@ -79,11 +85,11 @@ def compare(source: Path, reexport: Path) -> dict[str, Any]:
         )
     )
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "status": "fail",
         "source": str(source),
         "reexport": str(reexport),
-        "ignored_fields": sorted(IGNORED_ELEMENT_KEYS),
+        "ignored_fields": ignored_fields,
         "semantic_equal": False,
         "diff": diff[:300],
         "diff_truncated": len(diff) > 300,
