@@ -1,0 +1,41 @@
+name: Verify Project Elementor Drive hashes once
+
+on:
+  push:
+    branches:
+      - source-maintenance/drive-hash-preflight-2026-08-15
+    paths:
+      - .github/workflows/verify-drive-hashes-once.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download and hash current canonical sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p drive
+          fetch() {
+            local id="$1" name="$2" expected="$3"
+            curl --fail --silent --show-error --location \
+              "https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t" \
+              --output "drive/${name}"
+            actual="$(sha256sum "drive/${name}" | awk '{print $1}')"
+            printf '%s  %s\n' "$actual" "$name"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "HASH MISMATCH: $name expected=$expected actual=$actual" >&2
+              exit 1
+            fi
+          }
+          fetch '15WQqEqSH4xnLlMfAbFEW3W4VXgycTRRN' '00-project-index-en-scope.md' 'cbb90b5faebaabe6644ec054bbf0baa248bcfbfd126604e66a0eda492216b41f'
+          fetch '1upguvLI0TdMQ2PsKpypQkgJCFeFRsPSg' '01-officiele-bronnen-en-currentness.md' '41ded1cc367805497445fea6ea46692867b2c9661bf81a77b717de6328a73b16'
+          fetch '1IeMd_9MABcnqo4FNDTrkiiRRU7XTsXNR' '02-preflight-editorstructuur-en-import-risk.md' '123ba956c044ca3136dfbc4d612367773422bb09d42e559670a0823a55f96940'
+          fetch '1ENCjhEKCoJTa9h6KiQp-bV4_vXH98hP0' '03-json-import-export-en-responsive.md' '4d38aab037a994c0ee17030d5c0de86d92693dfe446c045a05057af2fa9d4690'
+          fetch '1aXvbSmFvRaG-F5jJ5LYzNFXDOQ9KHHK6' '04-dynamic-forms-woocommerce-addons-en-livepoort.md' '583a66680ad520bd405bb9968e350a5100c7d331bb602cb643b57acd82ec518c'
+          fetch '1NLaB539baSuqcYNtDEB_TYmOPt2NZt_Q' '80-code-naar-elementor-conversie.md' '22aa501b9ed1e6218a6230cb0546bb0f58fefc96005a24fccd1eca3a560f7a45'
+          fetch '1XdkPxfA5GpDaDfYjGfFTJJsqeCLtOjrR' 'PROJECT-MANIFEST.json' '249cb5dd24e32c74374ae3b4fd0d4fc680abd42f4a8dc2a1075c616e1adc2716'
+          fetch '1FkXdL6hTXdBNHPbX0FFYRh5ZuwgSXHKL' 'PROJECT-MANIFEST.json.md' 'dea0fb0cb669962b29a877940c2b12d84a8d9fed147817d3d93c67da63e88011'
