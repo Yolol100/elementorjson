@@ -16,26 +16,12 @@ final class CLI_Command {
 	}
 
 	/**
-	 * Import one JSON template through Elementor's official Library Import CLI, then reopen/save/re-export it.
+	 * Export the disposable runtime context used for official Elementor CLI capability checks.
 	 *
 	 * ## OPTIONS
-	 * <template>
-	 * : Absolute JSON path.
 	 * --output=<path>
-	 * : Roundtrip JSON destination.
 	 */
-	public function import_roundtrip( array $args, array $assoc_args ): void {
-		$template_path = isset( $args[0] ) ? (string) $args[0] : '';
-		$output = isset( $assoc_args['output'] ) ? (string) $assoc_args['output'] : '';
-		if ( '' === $template_path || ! is_readable( $template_path ) || '' === $output ) {
-			\WP_CLI::error( 'import_roundtrip requires a readable template path and --output.' );
-			return;
-		}
-		if ( ! method_exists( '\\WP_CLI', 'runcommand' ) ) {
-			\WP_CLI::error( 'WP-CLI runcommand is unavailable.' );
-			return;
-		}
-
+	public function runtime_context( array $args, array $assoc_args ): void {
 		$administrators = get_users(
 			array(
 				'role'    => 'administrator',
@@ -45,46 +31,41 @@ final class CLI_Command {
 			)
 		);
 		if ( empty( $administrators ) || ! $administrators[0] instanceof \WP_User ) {
-			\WP_CLI::error( 'No administrator user is available for Elementor Library Import capability checks.' );
+			\WP_CLI::error( 'No administrator user is available in the disposable runtime.' );
 			return;
 		}
-		$administrator_id = (int) $administrators[0]->ID;
-
-		$before = get_posts( array(
-			'post_type'      => 'elementor_library',
-			'post_status'    => 'any',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-		) );
-		$command = 'elementor library import ' . escapeshellarg( $template_path ) . ' --returnType=ids --user=' . $administrator_id;
-		$result = \WP_CLI::runcommand(
-			$command,
+		$this->write_json_or_stdout(
 			array(
-				'return'     => 'all',
-				'exit_error' => false,
-				'launch'     => true,
+				'administrator_id' => (int) $administrators[0]->ID,
+				'elementor'        => defined( 'ELEMENTOR_VERSION' ) ? ELEMENTOR_VERSION : null,
+			),
+			$assoc_args['output'] ?? null,
+			'Runtime context'
+		);
+	}
+
+	/**
+	 * Export the current Elementor Library post IDs for before/after import diffing.
+	 *
+	 * ## OPTIONS
+	 * --output=<path>
+	 */
+	public function library_ids( array $args, array $assoc_args ): void {
+		$ids = get_posts(
+			array(
+				'post_type'      => 'elementor_library',
+				'post_status'    => 'any',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
 			)
 		);
-		if ( ! is_object( $result ) || ! isset( $result->return_code ) || 0 !== (int) $result->return_code ) {
-			$stderr = is_object( $result ) && isset( $result->stderr ) ? trim( (string) $result->stderr ) : '';
-			\WP_CLI::error( 'Elementor official Library Import failed.' . ( $stderr ? ' ' . $stderr : '' ) );
-			return;
-		}
-
-		$after = get_posts( array(
-			'post_type'      => 'elementor_library',
-			'post_status'    => 'any',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-		) );
-		$new_ids = array_values( array_diff( array_map( 'intval', $after ), array_map( 'intval', $before ) ) );
-		if ( 1 !== count( $new_ids ) ) {
-			\WP_CLI::error( sprintf( 'Expected exactly one new Elementor Library document, found %d.', count( $new_ids ) ) );
-			return;
-		}
-
-		$this->export_roundtrip( (int) $new_ids[0], $output );
-		\WP_CLI::success( sprintf( 'Official import + Elementor save + roundtrip export passed for Library template %d.', (int) $new_ids[0] ) );
+		$this->write_json_or_stdout(
+			array( 'ids' => array_values( array_map( 'intval', $ids ) ) ),
+			$assoc_args['output'] ?? null,
+			'Library IDs'
+		);
 	}
 
 	/**
@@ -98,7 +79,7 @@ final class CLI_Command {
 	 */
 	public function roundtrip( array $args, array $assoc_args ): void {
 		$post_id = isset( $args[0] ) ? absint( $args[0] ) : 0;
-		$output = isset( $assoc_args['output'] ) ? (string) $assoc_args['output'] : '';
+		$output  = isset( $assoc_args['output'] ) ? (string) $assoc_args['output'] : '';
 		if ( ! $post_id || '' === $output ) {
 			\WP_CLI::error( 'roundtrip requires a Library post ID and --output.' );
 			return;
@@ -129,17 +110,16 @@ final class CLI_Command {
 			return;
 		}
 
-		$content = $data['content'];
 		$filename = pathinfo( $template_path, PATHINFO_FILENAME );
-		$slug = isset( $assoc_args['slug'] ) ? sanitize_title( (string) $assoc_args['slug'] ) : sanitize_title( $filename );
-		$title = isset( $assoc_args['title'] ) ? sanitize_text_field( (string) $assoc_args['title'] ) : sanitize_text_field( (string) ( $data['title'] ?? $filename ) );
+		$slug     = isset( $assoc_args['slug'] ) ? sanitize_title( (string) $assoc_args['slug'] ) : sanitize_title( $filename );
+		$title    = isset( $assoc_args['title'] ) ? sanitize_text_field( (string) $assoc_args['title'] ) : sanitize_text_field( (string) ( $data['title'] ?? $filename ) );
 		if ( '' === $slug ) {
 			\WP_CLI::error( 'Could not derive a valid page slug.' );
 			return;
 		}
 
 		$existing = get_page_by_path( $slug, OBJECT, 'page' );
-		$postarr = array(
+		$postarr  = array(
 			'post_title'   => $title ?: $slug,
 			'post_name'    => $slug,
 			'post_type'    => 'page',
@@ -148,7 +128,7 @@ final class CLI_Command {
 		);
 		if ( $existing instanceof \WP_Post ) {
 			$postarr['ID'] = $existing->ID;
-			$post_id = wp_update_post( wp_slash( $postarr ), true );
+			$post_id       = wp_update_post( wp_slash( $postarr ), true );
 		} else {
 			$post_id = wp_insert_post( wp_slash( $postarr ), true );
 		}
@@ -157,7 +137,7 @@ final class CLI_Command {
 			return;
 		}
 
-		$encoded_content = wp_json_encode( $content );
+		$encoded_content = wp_json_encode( $data['content'] );
 		if ( false === $encoded_content ) {
 			\WP_CLI::error( 'Could not encode Elementor content.' );
 			return;
@@ -179,7 +159,7 @@ final class CLI_Command {
 			}
 		}
 
-		$url = get_permalink( $post_id );
+		$url      = get_permalink( $post_id );
 		$manifest = array(
 			'post_id'       => (int) $post_id,
 			'slug'          => $slug,
@@ -199,7 +179,7 @@ final class CLI_Command {
 			return;
 		}
 		$elementor = \Elementor\Plugin::instance();
-		$document = isset( $elementor->documents ) ? $elementor->documents->get( $post_id, false ) : false;
+		$document  = isset( $elementor->documents ) ? $elementor->documents->get( $post_id, false ) : false;
 		if ( ! is_object( $document ) || ! method_exists( $document, 'get_elements_data' ) || ! method_exists( $document, 'get_settings' ) || ! method_exists( $document, 'save' ) ) {
 			\WP_CLI::error( 'Elementor could not reopen the imported Library document.' );
 			return;
@@ -229,19 +209,22 @@ final class CLI_Command {
 			\WP_CLI::error( 'Elementor could not read the document after save.' );
 			return;
 		}
-		$post = get_post( $post_id );
+		$post          = get_post( $post_id );
 		$template_type = (string) get_post_meta( $post_id, '_elementor_template_type', true );
 		if ( '' === $template_type ) {
 			$template_type = 'page';
 		}
-		$payload = array(
-			'title'         => $post instanceof \WP_Post ? $post->post_title : 'Elementor template',
-			'type'          => $template_type,
-			'version'       => '0.4',
-			'page_settings' => empty( $settings ) ? array() : $settings,
-			'content'       => $elements,
+		$this->write_json_file(
+			$output,
+			array(
+				'title'         => $post instanceof \WP_Post ? $post->post_title : 'Elementor template',
+				'type'          => $template_type,
+				'version'       => '0.4',
+				'page_settings' => empty( $settings ) ? array() : $settings,
+				'content'       => $elements,
+			),
+			'Roundtrip export'
 		);
-		$this->write_json_file( $output, $payload, 'Roundtrip export' );
 	}
 
 	private function write_json_or_stdout( array $payload, $output, string $label ): void {
