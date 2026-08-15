@@ -7,11 +7,12 @@ A reusable QA pipeline for Elementor JSON templates. It combines source-level JS
 1. Reads Elementor export JSON from `templates/`.
 2. Audits the document structure, element IDs, editor family, `widgetType` values and widget settings.
 3. Starts a disposable WordPress environment with Hello Elementor and Elementor Free.
-4. Uses the included WordPress plugin to export the widgets and controls actually registered by Elementor in that runtime.
-5. Fails when a JSON template requests a widget that the runtime does not provide.
-6. Renders valid templates into isolated Elementor Canvas pages.
-7. Captures desktop, tablet and mobile screenshots with Playwright.
-8. Uploads audit reports, runtime metadata, render manifests and screenshots as GitHub Actions artifacts.
+4. Optionally installs and activates Elementor Pro when the repository secret `ELEMENTOR_PRO_LICENSE_KEY` is configured.
+5. Uses the included WordPress plugin to export the widgets and controls actually registered by Elementor in that runtime.
+6. Fails when a JSON template requests a widget that the runtime does not provide.
+7. Renders valid templates into isolated Elementor Canvas pages.
+8. Captures desktop, tablet and mobile screenshots with Playwright.
+9. Uploads audit reports, runtime metadata, render manifests and screenshots as GitHub Actions artifacts.
 
 ## Repository layout
 
@@ -40,13 +41,38 @@ Push or update the file. The `Elementor JSON QA` workflow runs automatically.
 The workflow produces:
 
 - `static-audit`: source-only JSON reports.
-- `elementor-runtime-qa`: registered widget inventory, runtime audit, render manifests, Playwright report and desktop/tablet/mobile screenshots.
+- `elementor-runtime-qa`: registered widget inventory, runtime audit, render manifests, Elementor Pro status, Playwright report and desktop/tablet/mobile screenshots.
 
 Template filenames become preview slugs. `homepage.json` is rendered at `/homepage/` inside the temporary test site.
 
-## Elementor Pro and add-ons
+## Elementor Pro
 
-The public CI baseline intentionally installs Elementor Free only. Do not commit licensed Elementor Pro packages, credentials or private download URLs to this public repository.
+Elementor Pro is never committed to this repository. The CI workflow uses Elementor's official Composer repository when a license key is available.
+
+One-time GitHub setup:
+
+1. Open the repository settings.
+2. Go to `Secrets and variables` > `Actions`.
+3. Create a repository secret named exactly `ELEMENTOR_PRO_LICENSE_KEY`.
+4. Paste your valid Elementor Pro license key as the secret value.
+
+On the next workflow run the pipeline will automatically:
+
+1. Install Elementor Core.
+2. Authenticate Composer against `composer.elementor.com` using the secret.
+3. Install `elementor/elementor-pro` through Composer.
+4. Activate the Elementor Pro plugin.
+5. Activate the Pro license through Elementor CLI.
+6. Export the actual Core + Pro widget/control inventory.
+7. Audit and render the supplied JSON using that runtime.
+8. Create desktop, tablet and mobile screenshots.
+9. Deactivate the temporary Pro license before destroying the WordPress environment.
+
+If the secret is not configured, the same workflow continues in Elementor Free mode. The artifact contains `elementor-pro-status.json` so it is explicit which runtime was used.
+
+Do not commit the license key, an Elementor Pro ZIP, Composer auth files, private download URLs or other credentials to this public repository.
+
+## Target-site and add-on inventory
 
 For accurate ownership/dependency checks against a real installation, install `wordpress-plugin/elementor-json-lab` on a controlled WordPress/Elementor environment and export its inventory:
 
@@ -56,7 +82,7 @@ wp ejl inventory --output=/tmp/inventory.json
 
 Save the resulting JSON as `target/inventory.json`. The auditor can then distinguish widgets registered by Elementor Core, Elementor Pro and third-party add-ons on that target.
 
-A target inventory proves availability in the scanned installation; it does not make Pro/add-on widgets render in the public Free-only CI runtime. A visual preview of those widgets requires a legally available matching plugin runtime.
+A target inventory proves availability in the scanned installation. Add-on widgets still require the matching add-on plugin in the preview runtime before their visual rendering can be considered verified.
 
 ## Commands
 
