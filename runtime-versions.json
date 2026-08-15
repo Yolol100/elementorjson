@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "wordpress": "7.0.2",
+  "php": "8.3",
+  "elementor_core": "4.2.2",
+  "hello_elementor": "3.4.9",
+  "node": "22",
+  "python": "3.12",
+  "npm": {
+    "@wordpress/env": "11.11.0",
+    "@playwright/test": "1.61.1",
+    "@axe-core/playwright": "4.12.1"
+  },
+  "elementor_pro": {
+    "version": null,
+    "rule": "Pro mode requires both ELEMENTOR_PRO_LICENSE_KEY secret and ELEMENTOR_PRO_VERSION repository variable; CI never installs unpinned Pro latest."
+  }
+}

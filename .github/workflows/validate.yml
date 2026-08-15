@@ -2,16 +2,17 @@ name: Elementor JSON QA
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - '.github/workflows/validate.yml'
-      - '.gitignore'
+      - '.github/dependabot.yml'
       - '.wp-env.json'
-      - 'AGENTS.md'
       - 'package.json'
+      - 'package-lock.json'
       - 'playwright.config.js'
       - 'runtime-contract.json'
+      - 'runtime-versions.json'
+      - 'SECURITY.md'
       - 'docs/**'
       - 'templates/**'
       - 'target/**'
@@ -22,12 +23,14 @@ on:
   pull_request:
     paths:
       - '.github/workflows/validate.yml'
-      - '.gitignore'
+      - '.github/dependabot.yml'
       - '.wp-env.json'
-      - 'AGENTS.md'
       - 'package.json'
+      - 'package-lock.json'
       - 'playwright.config.js'
       - 'runtime-contract.json'
+      - 'runtime-versions.json'
+      - 'SECURITY.md'
       - 'docs/**'
       - 'templates/**'
       - 'target/**'
@@ -44,43 +47,61 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  ELEMENTOR_CORE_VERSION: '4.2.2'
+  HELLO_ELEMENTOR_VERSION: '3.4.9'
+
 jobs:
   static-audit:
-    name: Static JSON audit
-    runs-on: ubuntu-latest
+    name: Static and supply-chain audit
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
 
-      - name: Validate runtime contract
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Validate runtime contract and pins
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          p = Path('runtime-contract.json')
-          data = json.loads(p.read_text())
-          assert data['repository'] == 'Yolol100/elementorjson'
-          assert data['default_branch'] == 'main'
-          assert data['workflow'] == '.github/workflows/validate.yml'
-          assert data['role'] == 'controlled_runtime'
-          assert data['evidence']['level'] == 'controlled_runtime'
-          assert data['trigger']['required_when']
-          assert data['trigger']['forbidden_when']
-          assert data['caller']['project'] == 'project-elementor'
-          assert data['caller']['domain_owner'] == 'elementor'
-          assert data['caller']['connector'] == 'GitHub'
-          assert data['activation']['before_run']
-          assert data['activation']['readback']
-          print('runtime-contract.json: valid')
+          contract = json.loads(Path('runtime-contract.json').read_text())
+          versions = json.loads(Path('runtime-versions.json').read_text())
+          assert contract['repository'] == 'Yolol100/elementorjson'
+          assert contract['default_branch'] == 'main'
+          assert contract['role'] == 'controlled_runtime'
+          assert contract['evidence']['level'] == 'controlled_runtime'
+          assert contract['pipeline'][0].startswith('validate')
+          assert versions['wordpress'] == '7.0.2'
+          assert versions['php'] == '8.3'
+          assert versions['elementor_core'] == '4.2.2'
+          assert versions['hello_elementor'] == '3.4.9'
+          print('runtime contracts: valid')
           PY
 
-      - name: Run auditor unit tests
+      - name: Install locked Node dependencies
+        run: npm ci --no-fund
+
+      - name: Audit Node dependencies
+        run: npm audit --audit-level=high
+
+      - name: Run Python unit tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Compile Python tools
+        run: python -m compileall -q tools tests
 
       - name: Parse all supplied templates
         shell: bash
@@ -95,75 +116,79 @@ jobs:
           fi
           for file in "${files[@]}"; do
             name="$(basename "${file%.json}")"
-            python tools/audit_elementor_json.py "$file" \
-              --output "artifacts/static-audit/${name}.json"
+            python tools/audit_elementor_json.py "$file" --output "artifacts/static-audit/${name}.json"
           done
 
       - name: Upload static audit
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: static-audit
           path: artifacts/static-audit
           if-no-files-found: warn
 
   runtime-preview:
-    name: Elementor runtime preview
-    runs-on: ubuntu-latest
+    name: Official import roundtrip and browser QA
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22'
+          cache: npm
 
-      - name: Install test tooling
-        run: npm install --no-audit --no-fund
+      - name: Install locked test tooling
+        run: npm ci --no-fund
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install browser engines
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Prepare mounted runtime files
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/templates
-          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/manifests
-          mkdir -p artifacts/runtime-audit artifacts/screenshots
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/{templates,roundtrip,manifests}
+          mkdir -p artifacts/{runtime-audit,roundtrip,screenshots}
           shopt -s nullglob
-          for file in templates/*.json; do
-            cp "$file" wordpress-plugin/elementor-json-lab/.runtime/templates/
-          done
+          for file in templates/*.json; do cp "$file" wordpress-plugin/elementor-json-lab/.runtime/templates/; done
 
-      - name: Start WordPress runtime
+      - name: Start pinned WordPress runtime
         run: npx wp-env start
 
-      - name: Install and activate QA dependencies
+      - name: Install and activate pinned QA dependencies
         shell: bash
         env:
           ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
+          ELEMENTOR_PRO_VERSION: ${{ vars.ELEMENTOR_PRO_VERSION }}
         run: |
           set -euo pipefail
-          npx wp-env run cli wp plugin install elementor --activate
+          npx wp-env run cli wp plugin install elementor --version="$ELEMENTOR_CORE_VERSION" --activate
           npx wp-env run cli wp plugin activate elementor-json-lab
-          npx wp-env run cli wp theme install hello-elementor --activate
+          npx wp-env run cli wp theme install hello-elementor --version="$HELLO_ELEMENTOR_VERSION" --activate
 
           if [[ -n "${ELEMENTOR_PRO_LICENSE_KEY:-}" ]]; then
+            if [[ -z "${ELEMENTOR_PRO_VERSION:-}" ]]; then
+              echo 'ELEMENTOR_PRO_LICENSE_KEY is configured but ELEMENTOR_PRO_VERSION is not pinned.' >&2
+              exit 1
+            fi
             npx wp-env run cli composer config --global --auth http-basic.composer.elementor.com token "$ELEMENTOR_PRO_LICENSE_KEY"
             npx wp-env run cli composer config repositories.elementor composer https://composer.elementor.com
             npx wp-env run cli composer config --no-plugins allow-plugins.composer/installers true
             npx wp-env run cli composer require composer/installers --no-interaction --no-progress
-            npx wp-env run cli composer require elementor/elementor-pro --no-interaction --no-progress
+            npx wp-env run cli composer require "elementor/elementor-pro:${ELEMENTOR_PRO_VERSION}" --no-interaction --no-progress
             npx wp-env run cli wp plugin activate elementor-pro
             npx wp-env run cli wp elementor-pro license activate "$ELEMENTOR_PRO_LICENSE_KEY"
-            printf '{"enabled":true,"source":"elementor-composer-repository"}\n' > artifacts/elementor-pro-status.json
+            printf '{"enabled":true,"version":"%s","source":"elementor-composer-repository"}\n' "$ELEMENTOR_PRO_VERSION" > artifacts/elementor-pro-status.json
           else
             printf '{"enabled":false,"reason":"ELEMENTOR_PRO_LICENSE_KEY secret not configured"}\n' > artifacts/elementor-pro-status.json
           fi
@@ -171,56 +196,98 @@ jobs:
           npx wp-env run cli wp rewrite structure '/%postname%/'
           npx wp-env run cli wp rewrite flush --hard
 
-      - name: Export runtime widget inventory
+      - name: Export runtime widget and design-system inventory
         run: >-
           npx wp-env run cli wp ejl inventory
           --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/inventory.json
 
-      - name: Validate runtime widget inventory
+      - name: Validate pinned runtime inventory
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          p = Path('wordpress-plugin/elementor-json-lab/.runtime/inventory.json')
-          data = json.loads(p.read_text())
-          env = data.get('environment', {})
-          devices = env.get('active_devices')
-          breakpoints = env.get('active_breakpoints')
-          widgets = data.get('widgets')
-          assert data.get('schema_version') == '1.1'
-          assert isinstance(devices, list) and 'desktop' in devices
-          assert isinstance(breakpoints, dict) and breakpoints
-          assert isinstance(widgets, dict) and widgets
-          print('runtime inventory: valid')
-          print('active devices:', ', '.join(str(item) for item in devices))
-          print('active breakpoints:', ', '.join(str(item) for item in breakpoints.keys()))
+          versions = json.loads(Path('runtime-versions.json').read_text())
+          data = json.loads(Path('wordpress-plugin/elementor-json-lab/.runtime/inventory.json').read_text())
+          env = data['environment']
+          assert data['schema_version'] == '1.2'
+          assert env['wordpress'] == versions['wordpress'], env
+          assert env['php'].startswith(versions['php'] + '.'), env
+          assert env['elementor'] == versions['elementor_core'], env
+          assert env['theme_version'] == versions['hello_elementor'], env
+          assert isinstance(env['active_devices'], list) and 'desktop' in env['active_devices']
+          assert isinstance(env['active_breakpoints'], dict) and env['active_breakpoints']
+          assert isinstance(data['design_system']['classic_globals']['colors'], list)
+          assert isinstance(data['design_system']['atomic_global_classes']['ids'], list)
+          assert isinstance(data['widgets'], dict) and data['widgets']
+          print('pinned runtime inventory: valid')
           PY
 
-      - name: Audit templates against registered widgets
+      - name: Audit templates against registered widgets and target inventory
         shell: bash
         run: |
           set -euo pipefail
           inventory='wordpress-plugin/elementor-json-lab/.runtime/inventory.json'
           shopt -s nullglob
-          files=(templates/*.json)
-          if (( ${#files[@]} == 0 )); then
-            echo 'No templates in templates/ yet.' | tee artifacts/runtime-audit/README.txt
-            exit 0
-          fi
-          for file in "${files[@]}"; do
+          for file in templates/*.json; do
             name="$(basename "${file%.json}")"
-            python tools/audit_elementor_json.py "$file" \
-              --inventory "$inventory" \
-              --output "artifacts/runtime-audit/${name}-runtime.json"
-
+            python tools/audit_elementor_json.py "$file" --inventory "$inventory" --output "artifacts/runtime-audit/${name}-runtime.json"
             if [[ -f target/inventory.json ]]; then
-              python tools/audit_elementor_json.py "$file" \
-                --inventory target/inventory.json \
-                --output "artifacts/runtime-audit/${name}-target.json"
+              python tools/audit_elementor_json.py "$file" --inventory target/inventory.json --output "artifacts/runtime-audit/${name}-target.json"
             fi
           done
 
-      - name: Render templates into WordPress pages
+      - name: Official Library import, Elementor save and semantic roundtrip
+        shell: bash
+        run: |
+          set -euo pipefail
+          context='wordpress-plugin/elementor-json-lab/.runtime/context.json'
+          npx wp-env run cli wp ejl runtime_context \
+            --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/context.json
+          admin_id="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('wordpress-plugin/elementor-json-lab/.runtime/context.json').read_text())
+          value = data.get('administrator_id')
+          assert isinstance(value, int) and value > 0
+          print(value)
+          PY
+          )"
+          shopt -s nullglob
+          for file in templates/*.json; do
+            filename="$(basename "$file")"
+            name="${filename%.json}"
+            before="wordpress-plugin/elementor-json-lab/.runtime/${name}-before.json"
+            after="wordpress-plugin/elementor-json-lab/.runtime/${name}-after.json"
+            npx wp-env run cli wp ejl library_ids \
+              --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/${name}-before.json"
+            npx wp-env run cli wp --user="$admin_id" elementor library import \
+              "/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/$filename" \
+              --returnType=ids
+            npx wp-env run cli wp ejl library_ids \
+              --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/${name}-after.json"
+            post_id="$(python - "$before" "$after" <<'PY'
+          import json
+          import sys
+          before = set(json.loads(open(sys.argv[1], encoding='utf-8').read())['ids'])
+          after = set(json.loads(open(sys.argv[2], encoding='utf-8').read())['ids'])
+          new = sorted(after - before)
+          if len(new) != 1:
+              raise SystemExit(f'Expected exactly one imported template, found {len(new)}: {new}')
+          print(new[0])
+          PY
+          )"
+            npx wp-env run cli wp ejl roundtrip "$post_id" \
+              --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/roundtrip/$filename"
+            python tools/compare_elementor_roundtrip.py "$file" \
+              "wordpress-plugin/elementor-json-lab/.runtime/roundtrip/$filename" \
+              --output "artifacts/roundtrip/${name}.json"
+            python tools/audit_elementor_json.py \
+              "wordpress-plugin/elementor-json-lab/.runtime/roundtrip/$filename" \
+              --inventory wordpress-plugin/elementor-json-lab/.runtime/inventory.json \
+              --output "artifacts/runtime-audit/${name}-roundtrip.json"
+          done
+
+      - name: Render roundtripped templates into isolated pages
         shell: bash
         run: |
           set -euo pipefail
@@ -230,13 +297,12 @@ jobs:
             stem="${filename%.json}"
             slug="$(printf '%s' "$stem" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')"
             npx wp-env run cli wp ejl render \
-              "/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/$filename" \
-              --slug="$slug" \
-              --page-template=elementor_canvas \
+              "/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/roundtrip/$filename" \
+              --slug="$slug" --page-template=elementor_canvas \
               --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/manifests/$slug.json"
           done
 
-      - name: Capture desktop tablet and mobile screenshots
+      - name: Cross-browser responsive accessibility and visual regression QA
         run: npm run test:visual
 
       - name: Collect runtime metadata
@@ -244,17 +310,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f wordpress-plugin/elementor-json-lab/.runtime/inventory.json ]]; then
-            cp wordpress-plugin/elementor-json-lab/.runtime/inventory.json artifacts/runtime-inventory.json
-          fi
-          if [[ -d wordpress-plugin/elementor-json-lab/.runtime/manifests ]]; then
-            mkdir -p artifacts/render-manifests
-            cp wordpress-plugin/elementor-json-lab/.runtime/manifests/*.json artifacts/render-manifests/ 2>/dev/null || true
-          fi
+          cp wordpress-plugin/elementor-json-lab/.runtime/inventory.json artifacts/runtime-inventory.json 2>/dev/null || true
+          mkdir -p artifacts/render-manifests artifacts/roundtrip-json
+          cp wordpress-plugin/elementor-json-lab/.runtime/manifests/*.json artifacts/render-manifests/ 2>/dev/null || true
+          cp wordpress-plugin/elementor-json-lab/.runtime/roundtrip/*.json artifacts/roundtrip-json/ 2>/dev/null || true
+          cp runtime-versions.json artifacts/runtime-versions.json
 
       - name: Upload runtime QA artifact
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: elementor-runtime-qa
           path: artifacts
@@ -267,9 +331,7 @@ jobs:
           ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
         run: |
           if [[ -n "${ELEMENTOR_PRO_LICENSE_KEY:-}" ]]; then
-            npx wp-env run cli wp plugin is-active elementor-pro >/dev/null 2>&1 \
-              && npx wp-env run cli wp elementor-pro license deactivate \
-              || true
+            npx wp-env run cli wp plugin is-active elementor-pro >/dev/null 2>&1 && npx wp-env run cli wp elementor-pro license deactivate || true
           fi
 
       - name: Stop WordPress environment
