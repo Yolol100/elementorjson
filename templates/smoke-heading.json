@@ -1,0 +1,36 @@
+{
+  "title": "Elementor JSON Lab smoke test",
+  "type": "page",
+  "version": "0.4",
+  "page_settings": [],
+  "content": [
+    {
+      "id": "smoke001",
+      "elType": "container",
+      "isInner": false,
+      "settings": [],
+      "elements": [
+        {
+          "id": "smoke002",
+          "elType": "widget",
+          "isInner": false,
+          "widgetType": "heading",
+          "settings": {
+            "title": "Elementor JSON Lab"
+          },
+          "elements": []
+        },
+        {
+          "id": "smoke003",
+          "elType": "widget",
+          "isInner": false,
+          "widgetType": "button",
+          "settings": {
+            "text": "Runtime preview"
+          },
+          "elements": []
+        }
+      ]
+    }
+  ]
+}

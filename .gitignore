@@ -1,0 +1,7 @@
+node_modules/
+.wp-env/
+artifacts/
+playwright-report/
+test-results/
+wordpress-plugin/elementor-json-lab/.runtime/
+.DS_Store

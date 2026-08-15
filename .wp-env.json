@@ -1,0 +1,9 @@
+{
+  "plugins": [
+    "./wordpress-plugin/elementor-json-lab"
+  ],
+  "config": {
+    "WP_DEBUG": true,
+    "SCRIPT_DEBUG": false
+  }
+}
