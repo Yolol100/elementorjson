@@ -310,7 +310,12 @@ def audit(template_path: Path, inventory_path: Optional[Path]) -> Dict[str, Any]
                         "path": f"{path}.widgetType",
                     })
 
-                if available:
+                # Classic widgets expose the legacy control inventory used by this
+                # auditor. Atomic e-* settings are typed props and are validated by
+                # validate_elementor_deep.py instead; comparing their prop names to
+                # legacy controls creates false positives. Availability/ownership
+                # checks above still apply to Atomic widgets.
+                if available and not widget_type.startswith("e-"):
                     controls = {
                         str(control.get("name")): control
                         for control in runtime_widget.get("controls", [])
