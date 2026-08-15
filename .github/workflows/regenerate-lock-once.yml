@@ -1,0 +1,42 @@
+name: Regenerate package lock once
+
+on:
+  push:
+    branches:
+      - fix/full-audit-hardening-2026-08-15
+    paths:
+      - package.json
+      - .github/workflows/regenerate-lock-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate-lock:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: fix/full-audit-hardening-2026-08-15
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+      - name: Regenerate lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify patched dependency and audit
+        run: |
+          npm ci --ignore-scripts --no-fund
+          node -e "const p=require('./node_modules/adm-zip/package.json'); if(p.version !== '0.6.0') process.exit(1); console.log('adm-zip', p.version)"
+          npm audit --audit-level=high
+      - name: Commit lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add package-lock.json
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Refresh lockfile with patched adm-zip'
+          git push origin HEAD:fix/full-audit-hardening-2026-08-15
