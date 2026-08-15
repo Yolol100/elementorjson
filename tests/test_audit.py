@@ -235,6 +235,22 @@ class AuditElementorJsonTests(unittest.TestCase):
         self.assertTrue(report["dynamic_reference_paths"])
         self.assertTrue(report["site_bound_reference_paths"])
 
+    def test_globals_remain_unverified_with_widget_inventory(self):
+        template = {
+            "title": "Global target bound", "type": "page", "version": "0.4", "page_settings": [],
+            "content": [{
+                "id": "global01", "elType": "widget", "widgetType": "heading",
+                "settings": {
+                    "title": "Hello",
+                    "__globals__": {"title_color": "globals/colors?id=primary"},
+                }, "elements": []
+            }],
+        }
+        report = self._audit_documents(template, self._classic_widget_inventory())
+        self.assertEqual("warning", report["status"])
+        self.assertTrue(any(item["code"] == "unverified_global_references" for item in report["warnings"]))
+        self.assertTrue(report["globals"])
+
     def test_element_depth_guard_fails_closed(self):
         node = {"id": "n0", "elType": "container", "settings": [], "elements": []}
         root = node
