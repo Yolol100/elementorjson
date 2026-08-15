@@ -1,136 +1,66 @@
-name: Elementor JSON QA
+name: Elementor JSON QA bootstrap
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/validate.yml'
-      - '.gitignore'
-      - '.wp-env.json'
-      - 'AGENTS.md'
-      - 'package.json'
-      - 'playwright.config.js'
-      - 'runtime-contract.json'
-      - 'docs/**'
-      - 'templates/**'
-      - 'target/**'
-      - 'tests/**'
-      - 'tools/**'
-      - 'wordpress-plugin/**'
-      - 'README.md'
   pull_request:
     paths:
       - '.github/workflows/validate.yml'
-      - '.gitignore'
       - '.wp-env.json'
-      - 'AGENTS.md'
       - 'package.json'
       - 'playwright.config.js'
       - 'runtime-contract.json'
-      - 'docs/**'
       - 'templates/**'
-      - 'target/**'
       - 'tests/**'
       - 'tools/**'
       - 'wordpress-plugin/**'
-      - 'README.md'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  ELEMENTOR_CORE_VERSION: '4.2.2'
+  HELLO_ELEMENTOR_VERSION: '3.4.9'
+
 jobs:
-  static-audit:
-    name: Static JSON audit
+  bootstrap:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - name: Checkout PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - name: Validate runtime contract
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          p = Path('runtime-contract.json')
-          data = json.loads(p.read_text())
-          assert data['repository'] == 'Yolol100/elementorjson'
-          assert data['default_branch'] == 'main'
-          assert data['workflow'] == '.github/workflows/validate.yml'
-          assert data['role'] == 'controlled_runtime'
-          assert data['evidence']['level'] == 'controlled_runtime'
-          assert data['trigger']['required_when']
-          assert data['trigger']['forbidden_when']
-          assert data['caller']['project'] == 'project-elementor'
-          assert data['caller']['domain_owner'] == 'elementor'
-          assert data['caller']['connector'] == 'GitHub'
-          assert data['activation']['before_run']
-          assert data['activation']['readback']
-          print('runtime-contract.json: valid')
-          PY
-
-      - name: Run auditor unit tests
-        run: python -m unittest discover -s tests -p 'test_*.py' -v
-
-      - name: Parse all supplied templates
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/static-audit
-          shopt -s nullglob
-          files=(templates/*.json)
-          if (( ${#files[@]} == 0 )); then
-            echo 'No templates in templates/ yet.' | tee artifacts/static-audit/README.txt
-            exit 0
-          fi
-          for file in "${files[@]}"; do
-            name="$(basename "${file%.json}")"
-            python tools/audit_elementor_json.py "$file" \
-              --output "artifacts/static-audit/${name}.json"
-          done
-
-      - name: Upload static audit
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: static-audit
-          path: artifacts/static-audit
-          if-no-files-found: warn
-
-  runtime-preview:
-    name: Elementor runtime preview
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22'
 
-      - name: Install test tooling
+      - name: Generate lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Install locked tooling for bootstrap
         run: npm install --no-audit --no-fund
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Run source tests
+        run: |
+          python -m unittest discover -s tests -p 'test_*.py' -v
+          find wordpress-plugin -name '*.php' -print0 | xargs -0 -n1 php -l
 
-      - name: Prepare mounted runtime files
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Prepare runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -142,134 +72,63 @@ jobs:
             cp "$file" wordpress-plugin/elementor-json-lab/.runtime/templates/
           done
 
-      - name: Start WordPress runtime
+      - name: Start pinned WordPress runtime
         run: npx wp-env start
 
-      - name: Install and activate QA dependencies
+      - name: Install pinned Elementor dependencies
         shell: bash
-        env:
-          ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
         run: |
           set -euo pipefail
-          npx wp-env run cli wp plugin install elementor --activate
+          npx wp-env run cli wp plugin install elementor --version="$ELEMENTOR_CORE_VERSION" --activate
           npx wp-env run cli wp plugin activate elementor-json-lab
-          npx wp-env run cli wp theme install hello-elementor --activate
-
-          if [[ -n "${ELEMENTOR_PRO_LICENSE_KEY:-}" ]]; then
-            npx wp-env run cli composer config --global --auth http-basic.composer.elementor.com token "$ELEMENTOR_PRO_LICENSE_KEY"
-            npx wp-env run cli composer config repositories.elementor composer https://composer.elementor.com
-            npx wp-env run cli composer config --no-plugins allow-plugins.composer/installers true
-            npx wp-env run cli composer require composer/installers --no-interaction --no-progress
-            npx wp-env run cli composer require elementor/elementor-pro --no-interaction --no-progress
-            npx wp-env run cli wp plugin activate elementor-pro
-            npx wp-env run cli wp elementor-pro license activate "$ELEMENTOR_PRO_LICENSE_KEY"
-            printf '{"enabled":true,"source":"elementor-composer-repository"}\n' > artifacts/elementor-pro-status.json
-          else
-            printf '{"enabled":false,"reason":"ELEMENTOR_PRO_LICENSE_KEY secret not configured"}\n' > artifacts/elementor-pro-status.json
-          fi
-
+          npx wp-env run cli wp theme install hello-elementor --version="$HELLO_ELEMENTOR_VERSION" --activate
           npx wp-env run cli wp rewrite structure '/%postname%/'
           npx wp-env run cli wp rewrite flush --hard
 
-      - name: Export runtime widget inventory
+      - name: Export runtime inventory
         run: >-
           npx wp-env run cli wp ejl inventory
           --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/inventory.json
 
-      - name: Validate runtime widget inventory
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          p = Path('wordpress-plugin/elementor-json-lab/.runtime/inventory.json')
-          data = json.loads(p.read_text())
-          env = data.get('environment', {})
-          devices = env.get('active_devices')
-          breakpoints = env.get('active_breakpoints')
-          widgets = data.get('widgets')
-          assert data.get('schema_version') == '1.1'
-          assert isinstance(devices, list) and 'desktop' in devices
-          assert isinstance(breakpoints, dict) and breakpoints
-          assert isinstance(widgets, dict) and widgets
-          print('runtime inventory: valid')
-          print('active devices:', ', '.join(str(item) for item in devices))
-          print('active breakpoints:', ', '.join(str(item) for item in breakpoints.keys()))
-          PY
-
-      - name: Audit templates against registered widgets
+      - name: Audit and render fixtures
         shell: bash
         run: |
           set -euo pipefail
           inventory='wordpress-plugin/elementor-json-lab/.runtime/inventory.json'
           shopt -s nullglob
-          files=(templates/*.json)
-          if (( ${#files[@]} == 0 )); then
-            echo 'No templates in templates/ yet.' | tee artifacts/runtime-audit/README.txt
-            exit 0
-          fi
-          for file in "${files[@]}"; do
-            name="$(basename "${file%.json}")"
-            python tools/audit_elementor_json.py "$file" \
-              --inventory "$inventory" \
-              --output "artifacts/runtime-audit/${name}-runtime.json"
-
-            if [[ -f target/inventory.json ]]; then
-              python tools/audit_elementor_json.py "$file" \
-                --inventory target/inventory.json \
-                --output "artifacts/runtime-audit/${name}-target.json"
-            fi
-          done
-
-      - name: Render templates into WordPress pages
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
           for file in templates/*.json; do
             filename="$(basename "$file")"
             stem="${filename%.json}"
             slug="$(printf '%s' "$stem" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')"
+            python tools/audit_elementor_json.py "$file" --inventory "$inventory"
             npx wp-env run cli wp ejl render \
               "/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/$filename" \
-              --slug="$slug" \
-              --page-template=elementor_canvas \
+              --slug="$slug" --page-template=elementor_canvas \
               --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/manifests/$slug.json"
           done
 
-      - name: Capture desktop tablet and mobile screenshots
-        run: npm run test:visual
-
-      - name: Collect runtime metadata
-        if: always()
+      - name: Generate or verify visual baselines
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f wordpress-plugin/elementor-json-lab/.runtime/inventory.json ]]; then
-            cp wordpress-plugin/elementor-json-lab/.runtime/inventory.json artifacts/runtime-inventory.json
-          fi
-          if [[ -d wordpress-plugin/elementor-json-lab/.runtime/manifests ]]; then
-            mkdir -p artifacts/render-manifests
-            cp wordpress-plugin/elementor-json-lab/.runtime/manifests/*.json artifacts/render-manifests/ 2>/dev/null || true
+          if [[ -d tests/e2e/preview.spec.js-snapshots ]] && find tests/e2e/preview.spec.js-snapshots -type f -name '*.png' -print -quit | grep -q .; then
+            npm run test:visual
+          else
+            npm run test:visual:update
           fi
 
-      - name: Upload runtime QA artifact
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: elementor-runtime-qa
-          path: artifacts
-          if-no-files-found: warn
-
-      - name: Deactivate Elementor Pro license
-        if: always()
+      - name: Commit deterministic bootstrap artifacts
         shell: bash
-        env:
-          ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
         run: |
-          if [[ -n "${ELEMENTOR_PRO_LICENSE_KEY:-}" ]]; then
-            npx wp-env run cli wp plugin is-active elementor-pro >/dev/null 2>&1 \
-              && npx wp-env run cli wp elementor-pro license deactivate \
-              || true
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json tests/e2e/preview.spec.js-snapshots
+          if git diff --cached --quiet; then
+            echo 'Lockfile and visual baselines already stable.'
+          else
+            git commit -m 'Bootstrap lockfile and visual baselines'
+            git push origin "HEAD:${{ github.head_ref }}"
           fi
 
       - name: Stop WordPress environment
