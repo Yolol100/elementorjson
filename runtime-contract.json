@@ -1,10 +1,19 @@
 {
-  "contract_version": "1.0",
+  "contract_version": "1.1",
   "repository": "Yolol100/elementorjson",
   "default_branch": "main",
   "workflow": ".github/workflows/validate.yml",
   "role": "controlled_runtime",
   "purpose": "Turn Elementor JSON source evidence into reproducible WordPress/Elementor runtime evidence with widget inventory, render checks and responsive screenshots.",
+  "caller": {
+    "project": "project-elementor",
+    "domain_owner": "elementor",
+    "controller_when_needed": "webactueel-workflow",
+    "connector": "GitHub",
+    "repository_is_capability_not_owner": true,
+    "surface_rule": "Chat web/desktop may use the exposed GitHub connector and remote GitHub Actions runtime. This does not imply local repository, terminal, WP-CLI or target-site access. Local or target claims still require their own surface/preflight.",
+    "qa_handoff": "website-qa-checklist for staging/live/browser acceptance beyond this disposable controlled runtime"
+  },
   "trigger": {
     "required_when": [
       "new or screenshot-reconstructed Elementor JSON needs a runtime or visual claim",
@@ -28,6 +37,30 @@
     "produce desktop, tablet and mobile screenshots for visual iteration",
     "separate source-only confidence from controlled-runtime evidence"
   ],
+  "activation": {
+    "before_run": [
+      "read runtime-contract.json from main and verify repository, branch, workflow and evidence role",
+      "classify editor family, dependency mode, target objects and risk with the Elementor skill",
+      "sanitize public-repository inputs and keep secrets outside committed files",
+      "write or update the canonical test JSON under templates/",
+      "optionally provide target/inventory.json only from a controlled target export"
+    ],
+    "run": [
+      "let the Elementor JSON QA workflow start from the main change or workflow_dispatch",
+      "resolve the resulting workflow run and require both Static JSON audit and Elementor runtime preview to complete successfully"
+    ],
+    "readback": [
+      "read static-audit and elementor-runtime-qa artifacts",
+      "check runtime inventory, runtime audit, render manifests and Elementor Pro status",
+      "inspect desktop, tablet and mobile screenshots before making a visual claim",
+      "record open target/staging tests separately"
+    ],
+    "iterate": [
+      "on a confirmed source/dependency/render defect, repair the canonical JSON and rerun",
+      "on a visual mismatch, edit the canonical JSON and compare the next screenshots",
+      "never convert controlled-runtime success into target_verified or production_observed without later evidence"
+    ]
+  },
   "inputs": {
     "templates": "templates/*.json",
     "target_inventory": "target/inventory.json (optional; exported from a controlled target installation)",
