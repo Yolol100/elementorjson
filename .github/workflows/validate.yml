@@ -176,6 +176,26 @@ jobs:
           npx wp-env run cli wp ejl inventory
           --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/inventory.json
 
+      - name: Validate runtime widget inventory
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('wordpress-plugin/elementor-json-lab/.runtime/inventory.json')
+          data = json.loads(p.read_text())
+          env = data.get('environment', {})
+          devices = env.get('active_devices')
+          breakpoints = env.get('active_breakpoints')
+          widgets = data.get('widgets')
+          assert data.get('schema_version') == '1.1'
+          assert isinstance(devices, list) and 'desktop' in devices
+          assert isinstance(breakpoints, dict) and breakpoints
+          assert isinstance(widgets, dict) and widgets
+          print('runtime inventory: valid')
+          print('active devices:', ', '.join(str(item) for item in devices))
+          print('active breakpoints:', ', '.join(str(item) for item in breakpoints.keys()))
+          PY
+
       - name: Audit templates against registered widgets
         shell: bash
         run: |
