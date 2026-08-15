@@ -1,0 +1,36 @@
+name: Hash Project Elementor Drive sources
+
+on:
+  push:
+    branches:
+      - source-maintenance/hash-drive-after-index
+      - source-maintenance/hash-drive-final
+
+permissions:
+  contents: read
+
+jobs:
+  hash:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download and hash current canonical sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p drive
+          fetch() {
+            local id="$1" name="$2"
+            curl --fail --silent --show-error --location \
+              "https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t" \
+              --output "drive/${name}"
+            sha256sum "drive/${name}"
+          }
+          fetch '15WQqEqSH4xnLlMfAbFEW3W4VXgycTRRN' '00-project-index-en-scope.md'
+          fetch '1upguvLI0TdMQ2PsKpypQkgJCFeFRsPSg' '01-officiele-bronnen-en-currentness.md'
+          fetch '1IeMd_9MABcnqo4FNDTrkiiRRU7XTsXNR' '02-preflight-editorstructuur-en-import-risk.md'
+          fetch '1ENCjhEKCoJTa9h6KiQp-bV4_vXH98hP0' '03-json-import-export-en-responsive.md'
+          fetch '1aXvbSmFvRaG-F5jJ5LYzNFXDOQ9KHHK6' '04-dynamic-forms-woocommerce-addons-en-livepoort.md'
+          fetch '1NLaB539baSuqcYNtDEB_TYmOPt2NZt_Q' '80-code-naar-elementor-conversie.md'
+          fetch '1XdkPxfA5GpDaDfYjGfFTJJsqeCLtOjrR' 'PROJECT-MANIFEST.json'
+          fetch '1FkXdL6hTXdBNHPbX0FFYRh5ZuwgSXHKL' 'PROJECT-MANIFEST.json.md'
+          fetch '1hdDZvcaQTvKo-SrmdTMMfeN7-U1oe8xf' 'SHA256SUMS.txt'
