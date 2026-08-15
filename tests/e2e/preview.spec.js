@@ -36,13 +36,24 @@ for (const template of templates) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
       const browserErrors = [];
+      const consoleErrors = [];
       page.on('pageerror', (error) => browserErrors.push(error.message));
+      page.on('console', (message) => {
+        if (message.type() === 'error') {
+          consoleErrors.push(message.text());
+        }
+      });
 
       const response = await page.goto(`/${slug}/`, { waitUntil: 'networkidle' });
       expect(response, 'Expected a WordPress response').not.toBeNull();
       expect(response.ok(), `Expected HTTP success for /${slug}/`).toBeTruthy();
 
       await expect(page.locator('body')).toBeVisible();
+      await expect(
+        page.locator('[data-elementor-type]').first(),
+        'Expected the page to contain rendered Elementor markup'
+      ).toBeVisible();
+
       fs.mkdirSync(screenshotDir, { recursive: true });
 
       await page.screenshot({
@@ -61,12 +72,16 @@ for (const template of templates) {
             viewport,
             url: page.url(),
             title: await page.title(),
-            browser_errors: browserErrors
+            browser_errors: browserErrors,
+            console_errors: consoleErrors
           },
           null,
           2
         ) + '\n'
       );
+
+      expect(browserErrors, 'Expected no uncaught browser errors').toEqual([]);
+      expect(consoleErrors, 'Expected no browser console errors').toEqual([]);
     });
   }
 }
