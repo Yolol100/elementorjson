@@ -1,5 +1,4 @@
 import copy
-import json
 import sys
 import unittest
 from pathlib import Path
@@ -142,6 +141,21 @@ class DeepValidationTests(unittest.TestCase):
         imported["content"][0]["elements"][0]["id"] = "newinner"
         report = compare(copy.deepcopy(ATOMIC_TEMPLATE), imported)
         self.assertEqual("pass", report["status"])
+
+    def test_roundtrip_accepts_importer_omitting_false_is_inner(self):
+        imported = copy.deepcopy(ATOMIC_TEMPLATE)
+        del imported["content"][0]["elements"][0]["isInner"]
+        report = compare(copy.deepcopy(ATOMIC_TEMPLATE), imported)
+        self.assertEqual("pass", report["status"])
+
+    def test_roundtrip_does_not_hide_true_is_inner(self):
+        source = copy.deepcopy(ATOMIC_TEMPLATE)
+        source["content"][0]["elements"][0]["isInner"] = True
+        imported = copy.deepcopy(source)
+        del imported["content"][0]["elements"][0]["isInner"]
+        report = compare(source, imported)
+        self.assertEqual("fail", report["status"])
+        self.assertTrue(any(item["path"].endswith(".isInner") for item in report["differences"]))
 
     def test_roundtrip_preserves_nested_reference_ids(self):
         source = copy.deepcopy(ATOMIC_TEMPLATE)
