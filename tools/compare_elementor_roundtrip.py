@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-MISSING = object()
 EMPTY_NORMALIZED_KEYS = {"page_settings", "settings", "editor_settings"}
 
 
@@ -35,7 +34,12 @@ def normalize(value: Any, parent_key: str = "") -> Any:
 
 
 def path_allowed(path: str, patterns: List[str]) -> bool:
-    return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
+    for pattern in patterns:
+        if path == pattern:
+            return True
+        if any(token in pattern for token in ("*", "?")) and fnmatch.fnmatchcase(path, pattern):
+            return True
+    return False
 
 
 def diff_values(source: Any, roundtrip: Any, path: str, differences: List[Dict[str, Any]], allow_added: List[str]) -> None:
