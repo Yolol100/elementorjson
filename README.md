@@ -2,6 +2,19 @@
 
 A reusable QA pipeline for Elementor JSON templates. It combines source-level JSON checks with a disposable WordPress + Elementor runtime and browser screenshots.
 
+`runtime-contract.json` is the machine-readable contract that tells Project Elementor and the Elementor skill when this repository is the correct controlled runtime, why it is used, which inputs it accepts, what it must execute and which evidence it may return.
+
+## When Project Elementor should use this repository
+
+Use this repository when Elementor JSON must move beyond source-only inspection into reproducible runtime evidence, including:
+
+- new or screenshot-reconstructed Elementor JSON that must be rendered or visually checked;
+- existing JSON changes to structure, widgets, widget settings, responsive behavior or dependencies;
+- requests to test, scan, render, preview, screenshot, verify widgets, verify Pro or check import behavior;
+- any claim that source-valid JSON also works in a real disposable WordPress/Elementor runtime.
+
+Do not use it for explanation/planning only, production writes, or exact target compatibility without target evidence. Because this repository is public, never commit confidential client JSON, private screenshots, credentials, personal data, license keys or secret URLs. Use sanitized fixtures or a private controlled runtime for sensitive work.
+
 ## What it does
 
 1. Reads Elementor export JSON from `templates/`.
@@ -19,6 +32,7 @@ A reusable QA pipeline for Elementor JSON templates. It combines source-level JS
 ```text
 .github/workflows/validate.yml        GitHub Actions QA pipeline
 .wp-env.json                          Disposable WordPress/Elementor environment
+runtime-contract.json                 Machine-readable trigger/runtime/evidence contract
 package.json                          wp-env and Playwright versions
 playwright.config.js                  Browser test configuration
 templates/                            Put Elementor JSON templates here
@@ -36,7 +50,7 @@ Put one or more Elementor JSON exports directly in `templates/`, for example:
 templates/homepage.json
 ```
 
-Push or update the file. The `Elementor JSON QA` workflow runs automatically.
+Push or update the file. The `Elementor JSON QA` workflow runs automatically. CI first validates `runtime-contract.json`, so the repository fails closed if its routing/evidence contract drifts.
 
 The workflow produces:
 
@@ -108,4 +122,4 @@ wp ejl render /path/to/homepage.json --slug=homepage
 
 ## Evidence boundary
 
-A clean source audit is not the same as a verified target import. The strongest portable result from this repository is a reproducible runtime preview. Exact compatibility with a customer installation still depends on its Elementor/Pro/add-on versions, editor family, globals, dynamic objects and site-specific IDs.
+A clean source audit is not the same as a verified target import. This repository returns `controlled_runtime` evidence: it can prove its disposable runtime, widget availability and configured viewport renders, but it cannot by itself prove exact customer staging compatibility, target-specific IDs, production behavior or full accessibility compliance.
