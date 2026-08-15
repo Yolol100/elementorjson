@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 ATOMIC_LAYOUT_TYPES = {"e-div-block", "e-flexbox", "e-grid"}
 CLASSIC_LAYOUT_TYPES = {"section", "column", "container"}
-RESPONSIVE_SUFFIXES = ("_tablet", "_mobile")
+LEGACY_RESPONSIVE_DEVICES = ("tablet", "mobile")
 SPECIAL_SETTING_KEYS = {
     "__globals__",
     "_css_classes",
@@ -30,15 +30,54 @@ def load_json(path: Path) -> Any:
         return json.load(handle)
 
 
-def normalize_control_name(setting_name: str, controls: Set[str]) -> Optional[str]:
+def runtime_responsive_devices(environment: Dict[str, Any]) -> Tuple[str, ...]:
+    devices: List[str] = []
+
+    active_devices = environment.get("active_devices")
+    if isinstance(active_devices, list):
+        devices.extend(
+            str(device)
+            for device in active_devices
+            if isinstance(device, (str, int)) and str(device) and str(device) != "desktop"
+        )
+
+    if not devices:
+        active_breakpoints = environment.get("active_breakpoints")
+        if isinstance(active_breakpoints, dict):
+            devices.extend(str(device) for device in active_breakpoints.keys() if str(device) and str(device) != "desktop")
+
+    if not devices:
+        devices.extend(LEGACY_RESPONSIVE_DEVICES)
+
+    # Longest first so `mobile_extra` is tested before `mobile`.
+    return tuple(sorted(set(devices), key=lambda item: (-len(item), item)))
+
+
+def normalize_control_name(
+    setting_name: str,
+    controls: Dict[str, Dict[str, Any]],
+    responsive_devices: Tuple[str, ...],
+) -> Optional[str]:
     if setting_name in controls:
         return setting_name
 
-    for suffix in RESPONSIVE_SUFFIXES:
-        if setting_name.endswith(suffix):
-            base = setting_name[: -len(suffix)]
-            if base in controls:
-                return base
+    for device in responsive_devices:
+        suffix = f"_{device}"
+        if not setting_name.endswith(suffix):
+            continue
+
+        base = setting_name[: -len(suffix)]
+        control = controls.get(base)
+        if not isinstance(control, dict) or not control.get("responsive"):
+            continue
+
+        allowed_devices = control.get("responsive_devices")
+        if isinstance(allowed_devices, list) and allowed_devices:
+            normalized_allowed = {str(item) for item in allowed_devices}
+            if device not in normalized_allowed:
+                continue
+
+        return base
 
     return None
 
@@ -122,6 +161,8 @@ def audit(template_path: Path, inventory_path: Optional[Path]) -> Dict[str, Any]
                 "message": str(exc),
                 "path": "$",
             })
+
+    responsive_devices = runtime_responsive_devices(inventory_environment)
 
     if not isinstance(document, dict):
         return {
@@ -271,7 +312,7 @@ def audit(template_path: Path, inventory_path: Optional[Path]) -> Dict[str, Any]
 
                 if available:
                     controls = {
-                        str(control.get("name"))
+                        str(control.get("name")): control
                         for control in runtime_widget.get("controls", [])
                         if isinstance(control, dict) and control.get("name")
                     }
@@ -279,7 +320,7 @@ def audit(template_path: Path, inventory_path: Optional[Path]) -> Dict[str, Any]
                         setting_name = str(setting_name)
                         if setting_name in SPECIAL_SETTING_KEYS or setting_name.startswith("_"):
                             continue
-                        if normalize_control_name(setting_name, controls) is None:
+                        if normalize_control_name(setting_name, controls, responsive_devices) is None:
                             finding["unrecognized_settings"].append(setting_name)
 
         for index, child in enumerate(children):
@@ -320,7 +361,7 @@ def audit(template_path: Path, inventory_path: Optional[Path]) -> Dict[str, Any]
     status = "fail" if errors else ("warning" if warnings else "pass")
 
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "template": str(template_path),
         "status": status,
         "document": {
@@ -330,6 +371,7 @@ def audit(template_path: Path, inventory_path: Optional[Path]) -> Dict[str, Any]
             "editor_family": editor_family,
         },
         "inventory_environment": inventory_environment,
+        "responsive_devices": list(responsive_devices),
         "summary": {
             "elements": element_count,
             "unique_ids": len(ids),
