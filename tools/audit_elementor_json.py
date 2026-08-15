@@ -404,10 +404,10 @@ def audit(template_path: Path, inventory_path: Optional[Path]) -> Dict[str, Any]
                 "$",
             )
 
-    if global_references and not inventory_supplied:
+    if global_references:
         add_warning(
             "unverified_global_references",
-            "Template references Elementor globals; target Kit/global existence still requires target evidence.",
+            "Template references Elementor globals; widget/control inventory does not prove target Kit/global existence.",
             "$",
         )
     if dynamic_references:
