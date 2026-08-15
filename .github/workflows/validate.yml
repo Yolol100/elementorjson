@@ -272,7 +272,7 @@ jobs:
             stem="${filename%.json}"
             imported_path="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/$filename"
 
-            npx wp-env run cli wp elementor library import "$imported_path" --returnType=ids \
+            npx wp-env run cli wp --user=admin elementor library import "$imported_path" --returnType=ids \
               | tee "artifacts/import-roundtrip/${stem}-import.txt"
 
             imported_id="$(npx wp-env run cli wp post list --post_type=elementor_library --orderby=ID --order=DESC --posts_per_page=1 --field=ID | tail -n 1 | tr -d '\r')"
