@@ -34,7 +34,7 @@ def iter_styles(styles: Any) -> Iterable[Tuple[str, Dict[str, Any]]]:
                 yield f".{key}", style
 
 
-def validate_document(document: Any) -> Dict[str, Any]:
+def validate_document(document: Any, allow_importer_defaults: bool = False) -> Dict[str, Any]:
     errors: List[Dict[str, str]] = []
     warnings: List[Dict[str, str]] = []
     families = set()
@@ -79,7 +79,10 @@ def validate_document(document: Any) -> Dict[str, Any]:
         if not isinstance(version, str) or not version:
             error("atomic_missing_version", "Atomic elements require a non-empty version string.", f"{path}.version")
 
-        if not isinstance(element.get("isInner"), bool):
+        if "isInner" not in element:
+            if not allow_importer_defaults:
+                error("atomic_invalid_is_inner", "Atomic source elements require boolean isInner.", f"{path}.isInner")
+        elif not isinstance(element.get("isInner"), bool):
             error("atomic_invalid_is_inner", "Atomic elements require boolean isInner.", f"{path}.isInner")
 
         editor_settings = element.get("editor_settings")
@@ -210,9 +213,10 @@ def validate_document(document: Any) -> Dict[str, Any]:
         editor_family = "unknown"
 
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "status": "fail" if errors else ("warning" if warnings else "pass"),
         "editor_family": editor_family,
+        "allow_importer_defaults": allow_importer_defaults,
         "summary": {
             "atomic_elements": atomic_elements,
             "repeater_ids": repeater_ids,
@@ -229,28 +233,41 @@ def main() -> int:
     parser.add_argument("template", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--fail-on-warning", action="store_true")
+    parser.add_argument(
+        "--allow-importer-defaults",
+        action="store_true",
+        help="Allow only proven Elementor Template Library storage defaults, such as omission of isInner=false.",
+    )
     args = parser.parse_args()
+
+    imported_runtime_path = "/.runtime/imported/" in f"/{args.template.as_posix()}"
+    allow_importer_defaults = args.allow_importer_defaults or imported_runtime_path
 
     try:
         document = load_json(args.template)
     except (OSError, json.JSONDecodeError) as exc:
         report = {
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "status": "fail",
             "editor_family": "unknown",
+            "allow_importer_defaults": allow_importer_defaults,
             "summary": {"atomic_elements": 0, "repeater_ids": 0, "errors": 1, "warnings": 0},
             "errors": [{"code": "invalid_json", "message": str(exc), "path": "$"}],
             "warnings": [],
         }
     else:
-        report = validate_document(document)
+        report = validate_document(document, allow_importer_defaults=allow_importer_defaults)
 
     report["template"] = str(args.template)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-    print(f"status={report['status']} editor_family={report['editor_family']} errors={report['summary']['errors']} warnings={report['summary']['warnings']}")
+    print(
+        f"status={report['status']} editor_family={report['editor_family']} "
+        f"importer_defaults={report.get('allow_importer_defaults', False)} "
+        f"errors={report['summary']['errors']} warnings={report['summary']['warnings']}"
+    )
     for item in report["errors"]:
         print(f"ERROR {item['code']}: {item['message']} ({item['path']})")
     for item in report["warnings"]:
