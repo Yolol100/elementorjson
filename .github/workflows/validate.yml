@@ -244,7 +244,7 @@ jobs:
           for file in templates/*.json; do
             filename="$(basename "$file")"
             name="${filename%.json}"
-            npx wp-env run cli wp ejl import-roundtrip \
+            npx wp-env run cli wp ejl import_roundtrip \
               "/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/$filename" \
               --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/roundtrip/$filename"
             python tools/compare_elementor_roundtrip.py "$file" \
