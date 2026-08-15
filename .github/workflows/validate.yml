@@ -142,6 +142,13 @@ jobs:
       - name: Install test tooling
         run: npm install --no-fund
 
+      - name: Capture generated npm lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s package-lock.json
+          cp package-lock.json artifacts/dependency-audit/package-lock.json
+
       - name: Audit npm dependencies
         shell: bash
         run: |
@@ -198,6 +205,9 @@ jobs:
 
           npx wp-env run cli wp rewrite structure '/%postname%/'
           npx wp-env run cli wp rewrite flush --hard
+
+      - name: Verify Elementor CLI administrator context
+        run: npx wp-env run cli wp user get admin --field=ID
 
       - name: Export runtime widget inventory
         run: >-
@@ -276,8 +286,8 @@ jobs:
             runtime_source="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/$filename"
             runtime_imported="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/imported/$filename"
 
-            npx wp-env run cli wp elementor library import "$runtime_source" --returnType=ids
-            npx wp-env run cli wp ejl export_library \
+            npx wp-env run cli wp --user=admin elementor library import "$runtime_source" --returnType=ids
+            npx wp-env run cli wp --user=admin ejl export_library \
               --source-template="$runtime_source" \
               --output="$runtime_imported"
 
@@ -313,7 +323,7 @@ jobs:
             filename="$(basename "$file")"
             stem="${filename%.json}"
             slug="$(printf '%s' "$stem" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')"
-            npx wp-env run cli wp ejl render \
+            npx wp-env run cli wp --user=admin ejl render \
               "/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/imported/$filename" \
               --slug="$slug" \
               --page-template=elementor_canvas \
@@ -362,4 +372,4 @@ jobs:
 
       - name: Stop WordPress environment
         if: always()
-        run: npx wp-env stop
+        run: npx wp-env stop || true
