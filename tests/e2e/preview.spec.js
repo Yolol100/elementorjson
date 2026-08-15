@@ -4,12 +4,39 @@ const { test, expect } = require('@playwright/test');
 
 const templateDir = path.resolve(__dirname, '../../templates');
 const screenshotDir = path.resolve(__dirname, '../../artifacts/screenshots');
+const inventoryPath = path.resolve(__dirname, '../../wordpress-plugin/elementor-json-lab/.runtime/inventory.json');
 
-const viewports = [
-  { name: 'desktop', width: 1440, height: 900 },
-  { name: 'tablet', width: 1024, height: 1366 },
-  { name: 'mobile', width: 390, height: 844 }
-];
+function buildViewports() {
+  const candidates = [
+    { name: 'desktop', width: 1440, height: 900 },
+    { name: 'tablet', width: 1024, height: 1366 },
+    { name: 'mobile', width: 390, height: 844 }
+  ];
+
+  if (fs.existsSync(inventoryPath)) {
+    const inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+    const breakpoints = inventory?.environment?.active_breakpoints || {};
+    for (const [name, breakpoint] of Object.entries(breakpoints)) {
+      const value = Number(breakpoint?.value);
+      if (!Number.isFinite(value) || value < 240 || value > 3840) {
+        continue;
+      }
+      candidates.push({ name: `breakpoint-${name}-at`, width: value, height: Math.max(844, Math.round(value * 1.2)) });
+      if (value + 1 <= 3840) {
+        candidates.push({ name: `breakpoint-${name}-above`, width: value + 1, height: Math.max(844, Math.round((value + 1) * 1.2)) });
+      }
+    }
+  }
+
+  const seen = new Set();
+  return candidates.filter(({ width }) => {
+    if (seen.has(width)) return false;
+    seen.add(width);
+    return true;
+  });
+}
+
+const viewports = buildViewports();
 
 function slugify(filename) {
   return path.basename(filename, '.json')
@@ -43,9 +70,7 @@ for (const template of templates) {
 
       page.on('pageerror', (error) => browserErrors.push(error.message));
       page.on('console', (message) => {
-        if (message.type() === 'error') {
-          consoleErrors.push(message.text());
-        }
+        if (message.type() === 'error') consoleErrors.push(message.text());
       });
       page.on('requestfailed', (request) => {
         const url = request.url();
@@ -69,24 +94,16 @@ for (const template of templates) {
       expect(response.ok(), `Expected HTTP success for /${slug}/`).toBeTruthy();
 
       await expect(page.locator('body')).toBeVisible();
-      await expect(
-        page.locator('[data-elementor-type]').first(),
-        'Expected the page to contain rendered Elementor markup'
-      ).toBeVisible();
+      await expect(page.locator('[data-elementor-type]').first(), 'Expected rendered Elementor markup').toBeVisible();
 
       const overflow = await page.evaluate(() => ({
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth
       }));
-      expect(
-        overflow.scrollWidth,
-        `Expected no horizontal page overflow: ${JSON.stringify(overflow)}`
-      ).toBeLessThanOrEqual(overflow.clientWidth + 1);
+      expect(overflow.scrollWidth, `Expected no horizontal page overflow: ${JSON.stringify(overflow)}`).toBeLessThanOrEqual(overflow.clientWidth + 1);
 
       const brokenImages = await page.locator('img').evaluateAll((images) =>
-        images
-          .filter((image) => image.complete && image.naturalWidth === 0)
-          .map((image) => image.currentSrc || image.src)
+        images.filter((image) => image.complete && image.naturalWidth === 0).map((image) => image.currentSrc || image.src)
       );
       expect(brokenImages, 'Expected no broken rendered images').toEqual([]);
 
@@ -109,25 +126,21 @@ for (const template of templates) {
 
       fs.writeFileSync(
         path.join(screenshotDir, `${basename}.json`),
-        JSON.stringify(
-          {
-            template,
-            slug,
-            browser: projectName,
-            viewport,
-            reduced_motion: true,
-            url: page.url(),
-            title: await page.title(),
-            browser_errors: browserErrors,
-            console_errors: consoleErrors,
-            failed_requests: failedRequests,
-            bad_responses: badResponses,
-            horizontal_overflow: overflow,
-            broken_images: brokenImages
-          },
-          null,
-          2
-        ) + '\n'
+        JSON.stringify({
+          template,
+          slug,
+          browser: projectName,
+          viewport,
+          reduced_motion: true,
+          url: page.url(),
+          title: await page.title(),
+          browser_errors: browserErrors,
+          console_errors: consoleErrors,
+          failed_requests: failedRequests,
+          bad_responses: badResponses,
+          horizontal_overflow: overflow,
+          broken_images: brokenImages
+        }, null, 2) + '\n'
       );
 
       expect(browserErrors, 'Expected no uncaught browser errors').toEqual([]);
