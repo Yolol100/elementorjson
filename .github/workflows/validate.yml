@@ -14,6 +14,7 @@ on:
       - 'tests/**'
       - 'tools/**'
       - 'wordpress-plugin/**'
+      - 'README.md'
   pull_request:
     paths:
       - '.github/workflows/validate.yml'
@@ -25,6 +26,7 @@ on:
       - 'tests/**'
       - 'tools/**'
       - 'wordpress-plugin/**'
+      - 'README.md'
   workflow_dispatch:
 
 permissions:
@@ -115,11 +117,27 @@ jobs:
 
       - name: Install and activate QA dependencies
         shell: bash
+        env:
+          ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
         run: |
           set -euo pipefail
           npx wp-env run cli wp plugin install elementor --activate
           npx wp-env run cli wp plugin activate elementor-json-lab
           npx wp-env run cli wp theme install hello-elementor --activate
+
+          if [[ -n "${ELEMENTOR_PRO_LICENSE_KEY:-}" ]]; then
+            npx wp-env run cli composer config --global --auth http-basic.composer.elementor.com token "$ELEMENTOR_PRO_LICENSE_KEY"
+            npx wp-env run cli composer config repositories.elementor composer https://composer.elementor.com
+            npx wp-env run cli composer config --no-plugins allow-plugins.composer/installers true
+            npx wp-env run cli composer require composer/installers --no-interaction --no-progress
+            npx wp-env run cli composer require elementor/elementor-pro --no-interaction --no-progress
+            npx wp-env run cli wp plugin activate elementor-pro
+            npx wp-env run cli wp elementor-pro license activate "$ELEMENTOR_PRO_LICENSE_KEY"
+            printf '{"enabled":true,"source":"elementor-composer-repository"}\n' > artifacts/elementor-pro-status.json
+          else
+            printf '{"enabled":false,"reason":"ELEMENTOR_PRO_LICENSE_KEY secret not configured"}\n' > artifacts/elementor-pro-status.json
+          fi
+
           npx wp-env run cli wp rewrite structure '/%postname%/'
           npx wp-env run cli wp rewrite flush --hard
 
@@ -191,6 +209,18 @@ jobs:
           name: elementor-runtime-qa
           path: artifacts
           if-no-files-found: warn
+
+      - name: Deactivate Elementor Pro license
+        if: always()
+        shell: bash
+        env:
+          ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
+        run: |
+          if [[ -n "${ELEMENTOR_PRO_LICENSE_KEY:-}" ]]; then
+            npx wp-env run cli wp plugin is-active elementor-pro >/dev/null 2>&1 \
+              && npx wp-env run cli wp elementor-pro license deactivate \
+              || true
+          fi
 
       - name: Stop WordPress environment
         if: always()
