@@ -64,11 +64,11 @@ Inside the WordPress runtime:
 
 ```bash
 wp ejl inventory --output=/tmp/inventory.json
-wp ejl import-roundtrip /path/to/template.json --output=/tmp/roundtrip.json
+wp ejl import_roundtrip /path/to/template.json --output=/tmp/roundtrip.json
 wp ejl render /tmp/roundtrip.json --slug=preview
 ```
 
-`wp ejl render` remains a frontend harness and is not itself import proof; `import-roundtrip` invokes Elementor's official Library Import command first.
+`wp ejl render` remains a frontend harness and is not itself import proof; `import_roundtrip` invokes Elementor's official Library Import command first.
 
 ## Repository security
 
