@@ -110,16 +110,16 @@ jobs:
             cp "$file" wordpress-plugin/elementor-json-lab/.runtime/templates/
           done
 
-      - name: Start WordPress and Elementor
+      - name: Start WordPress runtime
         run: npx wp-env start
 
-      - name: Activate QA dependencies
+      - name: Install and activate QA dependencies
         shell: bash
         run: |
           set -euo pipefail
-          npx wp-env run cli wp plugin activate elementor
+          npx wp-env run cli wp plugin install elementor --activate
           npx wp-env run cli wp plugin activate elementor-json-lab
-          npx wp-env run cli wp theme activate hello-elementor
+          npx wp-env run cli wp theme install hello-elementor --activate
           npx wp-env run cli wp rewrite structure '/%postname%/'
           npx wp-env run cli wp rewrite flush --hard
 
