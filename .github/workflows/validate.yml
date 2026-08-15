@@ -9,6 +9,7 @@ on:
       - '.wp-env.json'
       - 'package.json'
       - 'playwright.config.js'
+      - 'runtime-contract.json'
       - 'templates/**'
       - 'target/**'
       - 'tests/**'
@@ -21,6 +22,7 @@ on:
       - '.wp-env.json'
       - 'package.json'
       - 'playwright.config.js'
+      - 'runtime-contract.json'
       - 'templates/**'
       - 'target/**'
       - 'tests/**'
@@ -48,6 +50,28 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+
+      - name: Validate runtime contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('runtime-contract.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          assert data['repository'] == 'Yolol100/elementorjson'
+          assert data['default_branch'] == 'main'
+          assert data['workflow'] == '.github/workflows/validate.yml'
+          assert data['role'] == 'controlled_runtime'
+          assert data['evidence']['level'] == 'controlled_runtime'
+          assert data['trigger']['required_when']
+          assert data['trigger']['forbidden_when']
+          assert data['pipeline']
+          assert data['outputs']
+          print('runtime-contract.json: OK')
+          PY
 
       - name: Run auditor unit tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
