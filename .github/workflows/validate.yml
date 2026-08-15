@@ -240,12 +240,43 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          context='wordpress-plugin/elementor-json-lab/.runtime/context.json'
+          npx wp-env run cli wp ejl runtime_context \
+            --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/context.json
+          admin_id="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('wordpress-plugin/elementor-json-lab/.runtime/context.json').read_text())
+          value = data.get('administrator_id')
+          assert isinstance(value, int) and value > 0
+          print(value)
+          PY
+          )"
           shopt -s nullglob
           for file in templates/*.json; do
             filename="$(basename "$file")"
             name="${filename%.json}"
-            npx wp-env run cli wp ejl import_roundtrip \
+            before="wordpress-plugin/elementor-json-lab/.runtime/${name}-before.json"
+            after="wordpress-plugin/elementor-json-lab/.runtime/${name}-after.json"
+            npx wp-env run cli wp ejl library_ids \
+              --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/${name}-before.json"
+            npx wp-env run cli wp --user="$admin_id" elementor library import \
               "/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/$filename" \
+              --returnType=ids
+            npx wp-env run cli wp ejl library_ids \
+              --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/${name}-after.json"
+            post_id="$(python - "$before" "$after" <<'PY'
+          import json
+          import sys
+          before = set(json.loads(open(sys.argv[1], encoding='utf-8').read())['ids'])
+          after = set(json.loads(open(sys.argv[2], encoding='utf-8').read())['ids'])
+          new = sorted(after - before)
+          if len(new) != 1:
+              raise SystemExit(f'Expected exactly one imported template, found {len(new)}: {new}')
+          print(new[0])
+          PY
+          )"
+            npx wp-env run cli wp ejl roundtrip "$post_id" \
               --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/roundtrip/$filename"
             python tools/compare_elementor_roundtrip.py "$file" \
               "wordpress-plugin/elementor-json-lab/.runtime/roundtrip/$filename" \
