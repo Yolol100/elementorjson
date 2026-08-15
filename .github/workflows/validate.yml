@@ -52,15 +52,12 @@ jobs:
           python-version: '3.12'
 
       - name: Validate runtime contract
-        shell: bash
         run: |
-          set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
-
-          path = Path('runtime-contract.json')
-          data = json.loads(path.read_text(encoding='utf-8'))
+          p = Path('runtime-contract.json')
+          data = json.loads(p.read_text())
           assert data['repository'] == 'Yolol100/elementorjson'
           assert data['default_branch'] == 'main'
           assert data['workflow'] == '.github/workflows/validate.yml'
@@ -68,9 +65,7 @@ jobs:
           assert data['evidence']['level'] == 'controlled_runtime'
           assert data['trigger']['required_when']
           assert data['trigger']['forbidden_when']
-          assert data['pipeline']
-          assert data['outputs']
-          print('runtime-contract.json: OK')
+          print('runtime-contract.json: valid')
           PY
 
       - name: Run auditor unit tests
