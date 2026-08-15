@@ -1,0 +1,86 @@
+name: Diagnose Elementor importer roundtrip
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/diagnose-importer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+
+      - name: Install locked tooling
+        run: npm ci --no-fund
+
+      - name: Prepare runtime fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/templates
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/imported
+          cp templates/*.json wordpress-plugin/elementor-json-lab/.runtime/templates/
+
+      - name: Start pinned WordPress runtime
+        run: npx wp-env start
+
+      - name: Install pinned Elementor
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp plugin install elementor --version=4.2.2 --activate
+          npx wp-env run cli wp plugin activate elementor-json-lab
+          npx wp-env run cli wp theme install hello-elementor --version=3.4.9 --activate
+          npx wp-env run cli wp user get admin --field=ID
+
+      - name: Diagnose official importer and semantic roundtrip
+        shell: bash
+        run: |
+          set -uo pipefail
+          overall=0
+          for file in templates/*.json; do
+            filename="$(basename "$file")"
+            stem="${filename%.json}"
+            runtime_source="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/$filename"
+            runtime_imported="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/imported/$filename"
+            report="/tmp/${stem}-roundtrip.json"
+            deep="/tmp/${stem}-deep.json"
+
+            echo "===== ${filename}: IMPORT ====="
+            npx wp-env run cli wp --user=admin elementor library import "$runtime_source" --returnType=ids || overall=1
+
+            echo "===== ${filename}: EXPORT IMPORTER STORAGE ====="
+            npx wp-env run cli wp --user=admin ejl export_library --source-template="$runtime_source" --output="$runtime_imported" || overall=1
+
+            echo "===== ${filename}: SEMANTIC ROUNDTRIP ====="
+            if ! python tools/compare_elementor_roundtrip.py "$file" "wordpress-plugin/elementor-json-lab/.runtime/imported/$filename" --output "$report"; then
+              overall=1
+            fi
+            cat "$report" || true
+
+            echo "===== ${filename}: IMPORTED DEEP VALIDATION ====="
+            if ! python tools/validate_elementor_deep.py "wordpress-plugin/elementor-json-lab/.runtime/imported/$filename" --output "$deep"; then
+              overall=1
+            fi
+            cat "$deep" || true
+
+            echo "===== ${filename}: IMPORTED JSON ====="
+            python -m json.tool "wordpress-plugin/elementor-json-lab/.runtime/imported/$filename" || true
+          done
+          exit "$overall"
+
+      - name: Stop WordPress runtime
+        if: always()
+        run: npx wp-env stop || true
