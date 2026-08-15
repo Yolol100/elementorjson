@@ -2,7 +2,7 @@
 
 A reusable QA pipeline for Elementor JSON templates. It combines source-level JSON checks with a disposable WordPress + Elementor runtime and browser screenshots.
 
-`runtime-contract.json` is the machine-readable contract that tells Project Elementor and the Elementor skill when this repository is the correct controlled runtime, why it is used, which inputs it accepts, what it must execute and which evidence it may return.
+`runtime-contract.json` is the machine-readable contract that tells Project Elementor and the Elementor skill when this repository is the correct controlled runtime, why it is used, which inputs it accepts, what it must execute and which evidence it may return. The detailed caller/handoff contract is documented in `docs/project-elementor-integration.md`.
 
 ## When Project Elementor should use this repository
 
@@ -33,6 +33,7 @@ Do not use it for explanation/planning only, production writes, or exact target 
 .github/workflows/validate.yml        GitHub Actions QA pipeline
 .wp-env.json                          Disposable WordPress/Elementor environment
 runtime-contract.json                 Machine-readable trigger/runtime/evidence contract
+docs/project-elementor-integration.md Detailed Project Elementor caller/handoff contract
 package.json                          wp-env and Playwright versions
 playwright.config.js                  Browser test configuration
 templates/                            Put Elementor JSON templates here
