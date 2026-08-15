@@ -1,0 +1,191 @@
+name: Elementor JSON QA
+
+on:
+  push:
+    paths:
+      - '.github/workflows/validate.yml'
+      - '.wp-env.json'
+      - 'package.json'
+      - 'playwright.config.js'
+      - 'templates/**'
+      - 'target/**'
+      - 'tests/**'
+      - 'tools/**'
+      - 'wordpress-plugin/**'
+  pull_request:
+    paths:
+      - '.github/workflows/validate.yml'
+      - '.wp-env.json'
+      - 'package.json'
+      - 'playwright.config.js'
+      - 'templates/**'
+      - 'target/**'
+      - 'tests/**'
+      - 'tools/**'
+      - 'wordpress-plugin/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-audit:
+    name: Static JSON audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run auditor unit tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Parse all supplied templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/static-audit
+          shopt -s nullglob
+          files=(templates/*.json)
+          if (( ${#files[@]} == 0 )); then
+            echo 'No templates in templates/ yet.' | tee artifacts/static-audit/README.txt
+            exit 0
+          fi
+          for file in "${files[@]}"; do
+            name="$(basename "${file%.json}")"
+            python tools/audit_elementor_json.py "$file" \
+              --output "artifacts/static-audit/${name}.json"
+          done
+
+      - name: Upload static audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-audit
+          path: artifacts/static-audit
+          if-no-files-found: warn
+
+  runtime-preview:
+    name: Elementor runtime preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install test tooling
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare mounted runtime files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/templates
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/manifests
+          mkdir -p artifacts/runtime-audit artifacts/screenshots
+          shopt -s nullglob
+          for file in templates/*.json; do
+            cp "$file" wordpress-plugin/elementor-json-lab/.runtime/templates/
+          done
+
+      - name: Start WordPress and Elementor
+        run: npx wp-env start
+
+      - name: Activate QA dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp plugin activate elementor
+          npx wp-env run cli wp plugin activate elementor-json-lab
+          npx wp-env run cli wp theme activate hello-elementor
+          npx wp-env run cli wp rewrite structure '/%postname%/'
+          npx wp-env run cli wp rewrite flush --hard
+
+      - name: Export runtime widget inventory
+        run: >-
+          npx wp-env run cli wp ejl inventory
+          --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/inventory.json
+
+      - name: Audit templates against registered widgets
+        shell: bash
+        run: |
+          set -euo pipefail
+          inventory='wordpress-plugin/elementor-json-lab/.runtime/inventory.json'
+          shopt -s nullglob
+          files=(templates/*.json)
+          if (( ${#files[@]} == 0 )); then
+            echo 'No templates in templates/ yet.' | tee artifacts/runtime-audit/README.txt
+            exit 0
+          fi
+          for file in "${files[@]}"; do
+            name="$(basename "${file%.json}")"
+            python tools/audit_elementor_json.py "$file" \
+              --inventory "$inventory" \
+              --output "artifacts/runtime-audit/${name}-runtime.json"
+
+            if [[ -f target/inventory.json ]]; then
+              python tools/audit_elementor_json.py "$file" \
+                --inventory target/inventory.json \
+                --output "artifacts/runtime-audit/${name}-target.json"
+            fi
+          done
+
+      - name: Render templates into WordPress pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for file in templates/*.json; do
+            filename="$(basename "$file")"
+            stem="${filename%.json}"
+            slug="$(printf '%s' "$stem" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')"
+            npx wp-env run cli wp ejl render \
+              "/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/$filename" \
+              --slug="$slug" \
+              --page-template=elementor_canvas \
+              --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/manifests/$slug.json"
+          done
+
+      - name: Capture desktop tablet and mobile screenshots
+        run: npm run test:visual
+
+      - name: Collect runtime metadata
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f wordpress-plugin/elementor-json-lab/.runtime/inventory.json ]]; then
+            cp wordpress-plugin/elementor-json-lab/.runtime/inventory.json artifacts/runtime-inventory.json
+          fi
+          if [[ -d wordpress-plugin/elementor-json-lab/.runtime/manifests ]]; then
+            mkdir -p artifacts/render-manifests
+            cp wordpress-plugin/elementor-json-lab/.runtime/manifests/*.json artifacts/render-manifests/ 2>/dev/null || true
+          fi
+
+      - name: Upload runtime QA artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: elementor-runtime-qa
+          path: artifacts
+          if-no-files-found: warn
+
+      - name: Stop WordPress environment
+        if: always()
+        run: npx wp-env stop
