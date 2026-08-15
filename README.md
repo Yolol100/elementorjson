@@ -16,9 +16,9 @@ A green run is **controlled_runtime** evidence. It can prove the pinned disposab
 4. Install pinned Elementor Core + Hello; optionally install an explicitly pinned Pro version.
 5. Export registered widgets, controls, active breakpoints, classic Kit globals and Atomic global classes.
 6. Audit against runtime and optional sanitized `target/inventory.json`.
-7. Run Elementor's official `library import`, reopen/save the imported Library document, re-export it and compare semantically. Only Elementor element IDs are treated as volatile.
+7. Discover a real administrator in the disposable runtime, snapshot Library IDs, run Elementor's official `wp elementor library import` directly as that administrator, identify the one newly imported Library document, reopen/save it through Elementor, re-export it and compare semantically. Only Elementor element IDs are treated as volatile.
 8. Render the roundtripped JSON into an isolated Canvas page.
-9. Run Chromium, Firefox and WebKit across desktop/tablet/mobile plus active custom breakpoint widths; fail browser/console/network/overflow/serious automated WCAG issues and compare reviewed screenshots.
+9. Run Chromium, Firefox and WebKit across desktop/tablet/mobile plus active custom breakpoint widths; fail browser/console/network/overflow/serious automated WCAG issues and compare reviewed screenshots when an approved baseline exists.
 10. Upload evidence artifacts and tear down the runtime.
 
 ## Pinned runtime
@@ -60,15 +60,18 @@ python tools/compare_elementor_roundtrip.py templates/example.json artifacts/rou
 npm run test:visual
 ```
 
-Inside the WordPress runtime:
+Inside a disposable WordPress runtime the official import flow is:
 
 ```bash
-wp ejl inventory --output=/tmp/inventory.json
-wp ejl import_roundtrip /path/to/template.json --output=/tmp/roundtrip.json
+wp ejl runtime_context --output=/tmp/context.json
+wp ejl library_ids --output=/tmp/before.json
+wp --user=<administrator-id-from-context> elementor library import /path/to/template.json --returnType=ids
+wp ejl library_ids --output=/tmp/after.json
+wp ejl roundtrip <new-library-id-from-before-after-diff> --output=/tmp/roundtrip.json
 wp ejl render /tmp/roundtrip.json --slug=preview
 ```
 
-`wp ejl render` remains a frontend harness and is not itself import proof; `import_roundtrip` invokes Elementor's official Library Import command first.
+CI discovers both IDs; nothing is hardcoded. `wp ejl render` remains a frontend harness and is not itself import proof.
 
 ## Repository security
 
