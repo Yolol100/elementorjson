@@ -31,6 +31,14 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertTrue(any("production" in error for error in errors), errors)
         self.assertTrue(any("accessibility" in error for error in errors), errors)
 
+    def test_runtime_scopes_optional_pro_to_run_specific_version_evidence(self):
+        runtime = json.loads((ROOT / "runtime-contract.json").read_text(encoding="utf-8"))
+        limitations = "\n".join(runtime["evidence"]["does_not_prove"]).lower()
+        policy = runtime["baseline"]["dependency_policy"].lower()
+        self.assertIn("cross-run elementor pro version reproducibility", limitations)
+        self.assertIn("runtime-inventory.json", policy)
+        self.assertIn("exact installed pro version", policy)
+
     def test_toolkit_rejects_loss_of_mandatory_runtime_tools_and_assertions(self):
         toolkit = json.loads((ROOT / "toolkit-contract.json").read_text(encoding="utf-8"))
         for missing_tool in ["npm-audit", "hello-elementor"]:
