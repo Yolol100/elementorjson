@@ -1,10 +1,10 @@
 {
-  "contract_version": "1.2",
+  "contract_version": "1.3",
   "repository": "Yolol100/elementorjson",
   "default_branch": "main",
   "workflow": ".github/workflows/validate.yml",
   "role": "controlled_runtime",
-  "purpose": "Turn Elementor JSON source evidence into reproducible WordPress/Elementor controlled-runtime evidence with source validation, official Template Library import, semantic importer roundtrip, registered widget inventory and cross-browser responsive rendering.",
+  "purpose": "Turn Elementor JSON source evidence into reproducible pinned-baseline WordPress/Elementor controlled-runtime evidence with source validation, official Template Library import, semantic importer roundtrip, registered widget inventory and cross-browser responsive rendering. Optional Elementor Pro is run-resolved unless an explicit version constraint is introduced and is therefore evidenced only for the exact installed version captured in that run's runtime inventory.",
   "caller": {
     "project": "project-elementor",
     "domain_owner": "elementor",
@@ -76,7 +76,7 @@
     "elementor_core": "4.2.2",
     "hello_elementor": "3.4.9",
     "node": "22",
-    "dependency_policy": "direct npm versions are exact; npm audit blocks high/critical findings; a committed npm lockfile remains required for a fully immutable npm dependency graph"
+    "dependency_policy": "direct npm versions are exact; npm audit blocks high/critical findings; a committed npm lockfile remains required for a fully immutable npm dependency graph; optional Elementor Pro is resolved from Elementor's official Composer repository per run unless an explicit version constraint is added, and the exact installed Pro version must be taken from runtime-inventory.json for any Pro-specific claim"
   },
   "pipeline": [
     "validate this runtime contract",
@@ -85,7 +85,7 @@
     "audit npm dependencies and fail on high/critical findings",
     "start pinned disposable WordPress/PHP with wp-env",
     "install pinned Elementor Core and Hello Elementor",
-    "optionally install and activate Elementor Pro from Elementor's official Composer repository",
+    "optionally install and activate Elementor Pro from Elementor's official Composer repository and use the exact installed version captured in runtime-inventory.json as run-specific provenance",
     "export the registered Elementor widget and control inventory and verify pinned runtime versions",
     "audit every source template against the runtime and optional sanitized target inventory",
     "import every source template through wp elementor library import",
@@ -125,6 +125,7 @@
       "production behavior",
       "site-specific object IDs, target globals, Classes/Variables, conditions or dynamic data",
       "Elementor Pro behavior when the Pro secret was not present for the run",
+      "cross-run Elementor Pro version reproducibility when Pro was resolved without an explicit version constraint",
       "pixel-perfect visual equivalence without an approved reference baseline",
       "full accessibility or assistive-technology compliance"
     ]
