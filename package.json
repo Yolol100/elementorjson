@@ -6,7 +6,8 @@
   "scripts": {
     "wp:start": "wp-env start",
     "wp:stop": "wp-env stop",
-    "test:unit": "python -m unittest discover -s tests -p 'test_*.py' -v",
+    "test:contracts": "python tools/validate_repo_contracts.py",
+    "test:unit": "python tools/validate_repo_contracts.py && python -m unittest discover -s tests -p 'test_*.py' -v",
     "test:visual": "playwright test",
     "audit:deps": "npm audit --audit-level=high"
   },
