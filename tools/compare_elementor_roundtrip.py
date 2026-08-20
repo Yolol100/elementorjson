@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -83,6 +84,11 @@ def normalize(value: Any) -> Any:
     return value
 
 
+def semantic_fingerprint(value: Any) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def compare(source: Dict[str, Any], imported: Dict[str, Any]) -> Dict[str, Any]:
     source_semantic = normalize({
         "content": source.get("content", []),
@@ -137,6 +143,11 @@ def compare(source: Dict[str, Any], imported: Dict[str, Any]) -> Dict[str, Any]:
             "Element IDs are volatile; on actual Elementor element objects only, a missing isInner is normalized to false. "
             "Only explicitly whitelisted empty Template Library control defaults are ignored; non-empty and unknown controls remain strict."
         ),
+        "semantic_fingerprints": {
+            "algorithm": "sha256",
+            "source": semantic_fingerprint(source_semantic),
+            "imported": semantic_fingerprint(imported_semantic),
+        },
         "differences": differences,
     }
 
