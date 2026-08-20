@@ -15,7 +15,7 @@ Do not use it for production writes or claim exact target compatibility without 
 1. Validate `runtime-contract.json` and run Python unit tests.
 2. Run the classic/widget auditor plus deep Classic/Atomic structural checks, including typed Atomic props/styles and repeater-ID checks.
 3. Install the exact npm dependency graph with `npm ci` and fail on high/critical npm audit findings.
-4. Start pinned WordPress 7.0.2 / PHP 8.3 via wp-env.
+4. Start pinned WordPress 7.0.4 / PHP 8.3 via wp-env.
 5. Install pinned Elementor Core 4.2.2 and Hello Elementor 3.4.9.
 6. Optionally install/activate Elementor Pro from Elementor's official Composer repository when `ELEMENTOR_PRO_LICENSE_KEY` exists as an Actions secret.
 7. Export the registered widget/control inventory and verify runtime versions.
