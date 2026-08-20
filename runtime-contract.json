@@ -73,7 +73,7 @@
   "baseline": {
     "wordpress": "7.0.4",
     "php_series": "8.3",
-    "elementor_core": "4.2.2",
+    "elementor_core": "4.2.3",
     "hello_elementor": "3.4.9",
     "node": "22",
     "dependency_policy": "direct npm versions are exact; npm audit blocks high/critical findings; a committed npm lockfile remains required for a fully immutable npm dependency graph; optional Elementor Pro is resolved from Elementor's official Composer repository per run unless an explicit version constraint is added, and the exact installed Pro version must be taken from runtime-inventory.json for any Pro-specific claim"
