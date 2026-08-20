@@ -49,7 +49,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ELEMENTOR_CORE_VERSION: '4.2.2'
+  ELEMENTOR_CORE_VERSION: '4.2.3'
   HELLO_ELEMENTOR_VERSION: '3.4.9'
   EXPECTED_WORDPRESS_VERSION: '7.0.4'
   EXPECTED_PHP_SERIES: '8.3'
@@ -184,9 +184,9 @@ jobs:
           ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
         run: |
           set -euo pipefail
-          npx wp-env run cli wp plugin install elementor --version="$ELEMENTOR_CORE_VERSION" --activate
+          npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION" --activate
           npx wp-env run cli wp plugin activate elementor-json-lab
-          npx wp-env run cli wp theme install hello-elementor --version="$HELLO_ELEMENTOR_VERSION" --activate
+          npx wp-env run cli wp theme install hello-elementor -- --version="$HELLO_ELEMENTOR_VERSION" --activate
 
           if [[ -n "${ELEMENTOR_PRO_LICENSE_KEY:-}" ]]; then
             npx wp-env run cli composer config --global --auth http-basic.composer.elementor.com token "$ELEMENTOR_PRO_LICENSE_KEY"
