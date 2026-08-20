@@ -71,7 +71,7 @@
     "reference_visual": "kept outside this public repository when confidential; used by the calling assistant for comparison"
   },
   "baseline": {
-    "wordpress": "7.0.2",
+    "wordpress": "7.0.4",
     "php_series": "8.3",
     "elementor_core": "4.2.2",
     "hello_elementor": "3.4.9",
