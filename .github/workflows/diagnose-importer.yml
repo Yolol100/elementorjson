@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - '.github/workflows/diagnose-importer.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/diagnose-importer.yml'
 
 permissions:
   contents: read
@@ -18,7 +21,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
 
@@ -40,9 +43,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wp-env run cli wp plugin install elementor --version=4.2.2 --activate
+          npx wp-env run cli wp plugin install elementor -- --version=4.2.3 --activate
           npx wp-env run cli wp plugin activate elementor-json-lab
-          npx wp-env run cli wp theme install hello-elementor --version=3.4.9 --activate
+          npx wp-env run cli wp theme install hello-elementor -- --version=3.4.9 --activate
           npx wp-env run cli wp user get admin --field=ID
 
       - name: Diagnose official importer and semantic roundtrip
