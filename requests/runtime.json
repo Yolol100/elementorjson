@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "request_id": "elementor-ten-score-fixed-20260823",
+  "enabled": true,
+  "owner": "elementor",
+  "project_id": "project-elementor",
+  "for": "Webactueel 10-score controlled-runtime acceptance after bridge dispatch fix",
+  "task": "Run the existing pinned Elementor QA workflow through the correlated orchestrator bridge",
+  "why": "Prove exact request-head to successful child-run, required artifacts and immutable result correlation",
+  "trigger_when": "Only for this explicit public read-only controlled-runtime acceptance request",
+  "do_not_trigger_when": "Never use this request for production mutation, target claims or confidential input",
+  "requested_by": "webactueel-workflow",
+  "source_context": {
+    "project_id": "project-elementor",
+    "source_set_version": "2026-08-15.2-controlled-runtime-hardened"
+  }
+}
