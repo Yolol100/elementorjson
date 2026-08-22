@@ -67,6 +67,14 @@ class OrchestratorRuntimeRequestTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requested_by"):
             module.validate_request(data)
 
+    def test_bridge_does_not_send_undeclared_workflow_inputs(self):
+        validate = (ROOT / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
+        bridge = (ROOT / ".github" / "workflows" / "orchestrator-request.yml").read_text(encoding="utf-8")
+        dispatch_block = validate.split("workflow_dispatch:", 1)[1].split("\n\npermissions:", 1)[0]
+        self.assertNotIn("inputs:", dispatch_block)
+        self.assertIn("payload = json.dumps({'ref': ref}).encode()", bridge)
+        self.assertNotIn("'inputs':", bridge)
+
 
 if __name__ == "__main__":
     unittest.main()
