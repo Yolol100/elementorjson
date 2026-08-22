@@ -1,0 +1,211 @@
+name: Elementor Orchestrator Request
+
+on:
+  push:
+    branches:
+      - 'runtime/**'
+    paths:
+      - 'requests/runtime.json'
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: elementor-orchestrator-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  correlated-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout immutable request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate controller request
+        id: request
+        run: python3 tools/orchestrator_runtime_request.py requests/runtime.json --github-output "$GITHUB_OUTPUT"
+
+      - name: Dispatch pinned Elementor QA on the same request head
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request
+          repo = os.environ['GITHUB_REPOSITORY']
+          ref = os.environ['GITHUB_REF_NAME']
+          token = os.environ['GH_TOKEN']
+          url = f'https://api.github.com/repos/{repo}/actions/workflows/validate.yml/dispatches'
+          payload = json.dumps({'ref': ref, 'inputs': {'url': 'https://example.com/'}}).encode()
+          req = urllib.request.Request(url, data=payload, method='POST', headers={
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f'Bearer {token}',
+              'X-GitHub-Api-Version': '2026-03-10',
+              'User-Agent': 'webactueel-elementor-orchestrator',
+              'Content-Type': 'application/json',
+          })
+          with urllib.request.urlopen(req, timeout=30) as response:
+              if response.status != 204:
+                  raise SystemExit(f'unexpected dispatch status: {response.status}')
+          PY
+
+      - name: Wait for exact child run and required artifacts
+        id: child
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUEST_ID: ${{ steps.request.outputs.request_id }}
+          SOURCE_SET_VERSION: ${{ steps.request.outputs.source_set_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          branch = os.environ['GITHUB_REF_NAME']
+          request_head = os.environ['GITHUB_SHA']
+          token = os.environ['GH_TOKEN']
+          request_id = os.environ['REQUEST_ID']
+          source_set_version = os.environ['SOURCE_SET_VERSION']
+          api = f'https://api.github.com/repos/{repo}'
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f'Bearer {token}',
+              'X-GitHub-Api-Version': '2026-03-10',
+              'User-Agent': 'webactueel-elementor-orchestrator',
+          }
+
+          def get_json(url):
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          run = None
+          query = urllib.parse.urlencode({'branch': branch, 'event': 'workflow_dispatch', 'per_page': 20})
+          for _ in range(180):
+              data = get_json(f'{api}/actions/workflows/validate.yml/runs?{query}')
+              matches = [item for item in data.get('workflow_runs', []) if item.get('head_sha') == request_head]
+              if matches:
+                  candidate = sorted(matches, key=lambda item: item.get('created_at', ''), reverse=True)[0]
+                  if candidate.get('status') == 'completed':
+                      run = candidate
+                      break
+              time.sleep(10)
+          if run is None:
+              raise SystemExit('timed out waiting for the exact Elementor QA child run')
+          if run.get('conclusion') != 'success':
+              raise SystemExit(f"Elementor QA child run concluded {run.get('conclusion')!r}")
+
+          artifacts_payload = get_json(f"{api}/actions/runs/{run['id']}/artifacts?per_page=100")
+          artifacts = artifacts_payload.get('artifacts', [])
+          by_name = {item.get('name'): item for item in artifacts}
+          required = {'static-audit', 'elementor-runtime-qa'}
+          missing = sorted(required - set(by_name))
+          if missing:
+              raise SystemExit(f"required child artifacts missing: {', '.join(missing)}")
+
+          def sha256(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          templates = []
+          for path in sorted(Path('templates').glob('*.json')):
+              templates.append({'path': str(path), 'sha256': sha256(path)})
+
+          result = {
+              'schema': 'webactueel-elementor-runtime-result/1.0',
+              'status': 'accepted',
+              'request_id': request_id,
+              'owner': 'elementor',
+              'project_id': 'project-elementor',
+              'source_context': {
+                  'project_id': 'project-elementor',
+                  'source_set_version': source_set_version,
+              },
+              'request_head_sha': request_head,
+              'runtime_contract_sha256': sha256('runtime-contract.json'),
+              'template_fingerprints': templates,
+              'child_run': {
+                  'id': run['id'],
+                  'url': run['html_url'],
+                  'head_sha': run['head_sha'],
+                  'event': run['event'],
+                  'status': run['status'],
+                  'conclusion': run['conclusion'],
+              },
+              'artifacts': [
+                  {
+                      'id': by_name[name]['id'],
+                      'name': name,
+                      'expired': bool(by_name[name].get('expired')),
+                  }
+                  for name in sorted(required)
+              ],
+              'claim_limit': 'controlled_runtime_only',
+          }
+          Path('orchestrator-result.json').write_text(json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+
+          result_path = f'results/runtime/{request_id}.json'
+          content = base64.b64encode(Path('orchestrator-result.json').read_bytes()).decode()
+          payload = json.dumps({
+              'message': f'result: Elementor runtime {request_id}',
+              'content': content,
+              'branch': branch,
+          }).encode()
+          request = urllib.request.Request(
+              f'{api}/contents/{urllib.parse.quote(result_path, safe="/")}',
+              data=payload,
+              method='PUT',
+              headers={**headers, 'Content-Type': 'application/json'},
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  written = json.load(response)
+          except urllib.error.HTTPError as exc:
+              if exc.code == 422:
+                  raise SystemExit('immutable result path already exists; refusing overwrite') from exc
+              raise
+
+          output = Path(os.environ['GITHUB_OUTPUT'])
+          with output.open('a', encoding='utf-8') as handle:
+              handle.write(f"run_id={run['id']}\n")
+              handle.write(f"run_url={run['html_url']}\n")
+              handle.write(f"result_path={result_path}\n")
+              handle.write(f"result_commit_sha={written['commit']['sha']}\n")
+          PY
+
+      - name: Upload bridge correlation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: elementor-orchestrator-correlation
+          path: orchestrator-result.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Summarize accepted child evidence
+        if: success()
+        run: |
+          {
+            echo '## Elementor orchestrator bridge'
+            echo
+            echo "- request_id: `${{ steps.request.outputs.request_id }}`"
+            echo "- request_head_sha: `${GITHUB_SHA}`"
+            echo "- child_run_id: `${{ steps.child.outputs.run_id }}`"
+            echo "- result: `${{ steps.child.outputs.result_path }}`"
+            echo
+            echo 'Accepted evidence is controlled-runtime only; target/staging/production claims remain separate.'
+          } >> "$GITHUB_STEP_SUMMARY"
