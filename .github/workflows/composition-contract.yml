@@ -1,0 +1,86 @@
+name: Page Composition Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/composition-contract.yml'
+      - 'contracts/**'
+      - 'docs/proof-polish-and-sidecars.md'
+      - 'sidecars/**'
+      - 'templates/**'
+      - 'tests/test_page_composition.py'
+      - 'tests/test_repo_contracts.py'
+      - 'toolkit-contract.json'
+      - 'tools/audit_page_composition.py'
+      - 'tools/validate_repo_contracts.py'
+  pull_request:
+    paths:
+      - '.github/workflows/composition-contract.yml'
+      - 'contracts/**'
+      - 'docs/proof-polish-and-sidecars.md'
+      - 'sidecars/**'
+      - 'templates/**'
+      - 'tests/test_page_composition.py'
+      - 'tests/test_repo_contracts.py'
+      - 'toolkit-contract.json'
+      - 'tools/audit_page_composition.py'
+      - 'tools/validate_repo_contracts.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  composition:
+    name: Composition and sidecar audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Validate repository contracts
+        run: python tools/validate_repo_contracts.py
+
+      - name: Run composition regression tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Audit every template with optional sidecars
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/composition-audit
+          mapfile -t files < <(find templates -maxdepth 1 -type f -name '*.json' -print | sort)
+          if (( ${#files[@]} == 0 )); then
+            echo 'No templates in templates/ yet.' | tee artifacts/composition-audit/README.txt
+            exit 0
+          fi
+
+          for file in "${files[@]}"; do
+            filename="$(basename "$file")"
+            stem="${filename%.json}"
+            intent="sidecars/${stem}.design-intent.json"
+            content="sidecars/${stem}.content-contract.json"
+            output="artifacts/composition-audit/${stem}.json"
+            command=(python tools/audit_page_composition.py "$file" --json-output "$output")
+            if [[ -f "$intent" ]]; then
+              command+=(--design-intent "$intent")
+            fi
+            if [[ -f "$content" ]]; then
+              command+=(--content-contract "$content")
+            fi
+            "${command[@]}"
+          done
+
+      - name: Upload composition audit
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: composition-audit
+          path: artifacts/composition-audit
+          if-no-files-found: warn
