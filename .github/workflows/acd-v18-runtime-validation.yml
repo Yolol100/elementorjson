@@ -32,27 +32,16 @@ jobs:
           python - <<'PY'
           import base64,gzip,hashlib,pathlib
           root=pathlib.Path('validation/acd-v18')
-          expected={
-            'payload.part00':'ed3dd357faf8d2353dc317e472bd6f5b94edb93e',
-            'payload.part01':'4dfa60bd72ef8abfa4d73532df18aa11a8f26e74',
-            'payload.part02':'906d73a84ceaa6475fe4a933b69a1f0c17b7e40d',
-            'payload.part03':'c89c7749f77bdb08828136c1830224a6979fa560',
-          }
-          pieces=[]
-          for name,want in expected.items():
-              s=(root/name).read_text()
-              got=hashlib.sha1(s.encode()).hexdigest()
-              if got != want and len(s)==2341:
-                  fixed=None
-                  for i in range(len(s)):
-                      t=s[:i]+s[i+1:]
-                      if hashlib.sha1(t.encode()).hexdigest()==want:
-                          fixed=t; break
-                  assert fixed is not None, (name,len(s),got)
-                  s=fixed
-              assert hashlib.sha1(s.encode()).hexdigest()==want, (name,len(s),hashlib.sha1(s.encode()).hexdigest())
-              pieces.append(s)
-          raw=''.join(pieces)
+          parts=[
+            (root/'payload.part00').read_text(),
+            ''.join((root/f'p01.{i:02d}').read_text() for i in range(6)),
+            (root/'payload.part02').read_text(),
+            (root/'payload.part03').read_text(),
+          ]
+          wants=['ed3dd357faf8d2353dc317e472bd6f5b94edb93e','4dfa60bd72ef8abfa4d73532df18aa11a8f26e74','906d73a84ceaa6475fe4a933b69a1f0c17b7e40d','c89c7749f77bdb08828136c1830224a6979fa560']
+          for i,(s,w) in enumerate(zip(parts,wants)):
+              assert hashlib.sha1(s.encode()).hexdigest()==w,(i,len(s),hashlib.sha1(s.encode()).hexdigest())
+          raw=''.join(parts)
           page=gzip.decompress(base64.b64decode(raw,validate=True))
           pathlib.Path('templates/acd-homepage-b2b-v18.json').write_bytes(page)
           for stem in ('design-intent','content-contract'):
