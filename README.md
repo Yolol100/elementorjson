@@ -1,5 +1,9 @@
 # Elementor JSON Lab
 
+> **Portfoliostatus:** Actief ondersteunend · publieke gecontroleerde Elementor QA-runtime
+
+**Rol in het platform:** Elementor JSON Lab valideert en test niet-gevoelige Elementor JSON in een publieke gecontroleerde runtime. Commit of upload hier nooit vertrouwelijke of privé-klantinhoud, privé-JSON, vertrouwelijke screenshots of credentials; gebruik voor gevoelige artifacts een afzonderlijke private runtime. Opgeschoonde responsive screenshots blijven toegestaan wanneer zij geen vertrouwelijke inhoud bevatten. De standaardroute vanuit de [Orchestrator](https://github.com/Yolol100/Orchestrator) gebruikt de geregistreerde gecorreleerde request-file-route. De repository ondersteunt daarnaast de generieke routes die in `runtime-contract.json` en `docs/project-elementor-integration.md` zijn vastgelegd; acceptatie-eisen blijven routespecifiek en bij de owning Elementor-workflow.
+
 Controlled-runtime QA for Elementor JSON. The repository validates source JSON, exercises Elementor's Template Library importer, compares importer storage semantically, renders the imported result in a pinned disposable WordPress/Elementor runtime, and runs responsive browser checks.
 
 `runtime-contract.json` is the machine-readable evidence contract. Project Elementor remains the domain owner; this repository is only the controlled-runtime capability.
@@ -59,3 +63,7 @@ Without that secret the run is explicitly Free-only; `elementor-pro-status.json`
 A green run supports only `controlled_runtime` evidence for the exact pinned disposable environment and covered fixtures. It does not by itself prove customer staging compatibility, `target_verified`, production behavior, editor UI reopen/save/re-export, site-specific objects/globals/conditions/dynamic data, Pro when the secret was absent, pixel-perfect equality without an approved reference visual, or full accessibility/assistive-technology compliance.
 
 For formal completion after implementation changes, require two stable green final controlled-runtime rounds, then use staging/`website-qa-checklist` when target or release claims are required.
+
+## Licentie
+
+Deze repository bevat momenteel geen open-sourcelicentie. Hergebruik, distributie of afgeleide werken zijn niet toegestaan zonder expliciete toestemming van de rechthebbende.
