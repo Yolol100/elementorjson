@@ -63,3 +63,7 @@ Without that secret the run is explicitly Free-only; `elementor-pro-status.json`
 A green run supports only `controlled_runtime` evidence for the exact pinned disposable environment and covered fixtures. It does not by itself prove customer staging compatibility, `target_verified`, production behavior, editor UI reopen/save/re-export, site-specific objects/globals/conditions/dynamic data, Pro when the secret was absent, pixel-perfect equality without an approved reference visual, or full accessibility/assistive-technology compliance.
 
 For formal completion after implementation changes, require two stable green final controlled-runtime rounds, then use staging/`website-qa-checklist` when target or release claims are required.
+
+## Licentie
+
+Deze repository bevat momenteel geen open-sourcelicentie. Hergebruik, distributie of afgeleide werken zijn niet toegestaan zonder expliciete toestemming van de rechthebbende.
