@@ -29,9 +29,37 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p templates target artifacts/acd-v18 artifacts/screenshots
-          cat validation/acd-v18/payload.part* | base64 -d | gzip -d > templates/acd-homepage-b2b-v18.json
-          base64 -d validation/acd-v18/acd-homepage-b2b-v18.design-intent.json.gz.b64 | gzip -d > target/acd-homepage-b2b-v18.design-intent.json
-          base64 -d validation/acd-v18/acd-homepage-b2b-v18.content-contract.json.gz.b64 | gzip -d > target/acd-homepage-b2b-v18.content-contract.json
+          python - <<'PY'
+          import base64,gzip,hashlib,pathlib
+          root=pathlib.Path('validation/acd-v18')
+          expected={
+            'payload.part00':'ed3dd357faf8d2353dc317e472bd6f5b94edb93e',
+            'payload.part01':'4dfa60bd72ef8abfa4d73532df18aa11a8f26e74',
+            'payload.part02':'906d73a84ceaa6475fe4a933b69a1f0c17b7e40d',
+            'payload.part03':'c89c7749f77bdb08828136c1830224a6979fa560',
+          }
+          pieces=[]
+          for name,want in expected.items():
+              s=(root/name).read_text()
+              got=hashlib.sha1(s.encode()).hexdigest()
+              if got != want and len(s)==2341:
+                  fixed=None
+                  for i in range(len(s)):
+                      t=s[:i]+s[i+1:]
+                      if hashlib.sha1(t.encode()).hexdigest()==want:
+                          fixed=t; break
+                  assert fixed is not None, (name,len(s),got)
+                  s=fixed
+              assert hashlib.sha1(s.encode()).hexdigest()==want, (name,len(s),hashlib.sha1(s.encode()).hexdigest())
+              pieces.append(s)
+          raw=''.join(pieces)
+          page=gzip.decompress(base64.b64decode(raw,validate=True))
+          pathlib.Path('templates/acd-homepage-b2b-v18.json').write_bytes(page)
+          for stem in ('design-intent','content-contract'):
+              b64=(root/f'acd-homepage-b2b-v18.{stem}.json.gz.b64').read_text()
+              out=gzip.decompress(base64.b64decode(b64,validate=True))
+              pathlib.Path(f'target/acd-homepage-b2b-v18.{stem}.json').write_bytes(out)
+          PY
           python -m json.tool templates/acd-homepage-b2b-v18.json >/dev/null
           python -m json.tool target/acd-homepage-b2b-v18.design-intent.json >/dev/null
           python -m json.tool target/acd-homepage-b2b-v18.content-contract.json >/dev/null
