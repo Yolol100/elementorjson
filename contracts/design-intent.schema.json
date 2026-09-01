@@ -8,6 +8,9 @@
     "schema_version": {"const": "1.0"},
     "page_role": {"type": "string"},
     "unit_strategy": {"enum": ["preserve-target", "relative-first", "target-defined"]},
+    "baseline_ref": {"type": "string"},
+    "baseline_version": {"type": "string"},
+    "component_tokens": {"type": "object"},
     "sections": {
       "type": "array",
       "items": {
@@ -20,6 +23,23 @@
           "visual_anchor": {"type": "string"},
           "background_mode": {"type": "string"},
           "alignment": {"type": "string"},
+          "density": {"enum": ["compact", "standard", "spacious"]},
+          "component_model": {"type": "string"},
+          "cta_tier": {"enum": ["none", "secondary", "primary"]},
+          "equal_height_strategy": {"type": "string"},
+          "layout_contract": {
+            "type": "object",
+            "properties": {
+              "desktop_columns": {"type": "integer", "minimum": 1},
+              "tablet_columns": {"type": "integer", "minimum": 1},
+              "mobile_columns": {"type": "integer", "minimum": 1},
+              "wrap": {"type": "string"},
+              "gap": {"type": "string"},
+              "width_strategy": {"type": "string"}
+            },
+            "additionalProperties": false
+          },
+          "component_tokens": {"type": "object"},
           "adjacent_contrast": {"type": "boolean"},
           "responsive_plan": {
             "type": "object",
