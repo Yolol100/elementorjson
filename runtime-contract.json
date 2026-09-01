@@ -1,10 +1,10 @@
 {
-  "contract_version": "1.3",
+  "contract_version": "1.4",
   "repository": "Yolol100/elementorjson",
   "default_branch": "main",
   "workflow": ".github/workflows/validate.yml",
   "role": "controlled_runtime",
-  "purpose": "Turn Elementor JSON source evidence into reproducible pinned-baseline WordPress/Elementor controlled-runtime evidence with source validation, official Template Library import, semantic importer roundtrip, registered widget inventory and cross-browser responsive rendering. Optional Elementor Pro is run-resolved unless an explicit version constraint is introduced and is therefore evidenced only for the exact installed version captured in that run's runtime inventory.",
+  "purpose": "Turn Elementor JSON source evidence into a deterministic whole-page visual-target prediction plus reproducible pinned-baseline WordPress/Elementor controlled-runtime evidence with source validation, official Template Library import, semantic importer roundtrip, registered widget inventory, cross-browser responsive rendering and DOM layout snapshots. Optional Elementor Pro is run-resolved unless an explicit version constraint is introduced and is therefore evidenced only for the exact installed version captured in that run's runtime inventory.",
   "caller": {
     "project": "project-elementor",
     "domain_owner": "elementor",
@@ -18,7 +18,7 @@
     "required_when": [
       "new or screenshot-reconstructed Elementor JSON needs a runtime or visual claim",
       "existing Elementor JSON changes structure, widgets, widget settings, responsive behavior or dependencies",
-      "the user asks to test, scan, render, preview, screenshot, verify widgets, verify Pro or check import behavior",
+      "the user asks to test, scan, model, render, preview, screenshot, verify widgets, verify Pro or check import behavior",
       "source-valid JSON is about to be described as runtime-valid, importer-valid or visually correct"
     ],
     "optional_when": [
@@ -31,14 +31,16 @@
     ]
   },
   "why": [
+    "build a deterministic whole-page source prediction before visual inspection and preserve uncertainty as explicit, declared, inferred or unknown",
     "detect malformed Classic or Atomic Elementor structures before import",
     "detect missing or unavailable Elementor widgets before target import",
     "check JSON against widgets and controls registered by a real Elementor runtime",
     "exercise Elementor's documented Template Library importer instead of treating direct postmeta writes as import proof",
     "detect semantic importer drift while ignoring only volatile Elementor element IDs",
     "prove that WordPress and Elementor can render the importer-produced template data in a disposable environment",
-    "produce Chromium, Firefox and WebKit evidence at desktop, tablet and mobile viewports",
-    "separate source-only, controlled-runtime and target evidence"
+    "produce Chromium, Firefox and WebKit evidence at desktop, tablet, mobile and active breakpoint boundaries",
+    "capture computed DOM geometry/layout metadata next to screenshots so visual review can check alignment, dimensions, gaps, overflow and responsive behavior against the source prediction",
+    "separate source-prediction, controlled-runtime and target evidence"
   ],
   "activation": {
     "before_run": [
@@ -46,42 +48,47 @@
       "classify editor family, dependency mode, target objects and risk with the Elementor skill",
       "sanitize public-repository inputs and keep secrets outside committed files",
       "write or update the canonical test JSON under templates/",
+      "build a visual-target artifact from the complete JSON before section-level repair; attach a matching safe design-intent sidecar when available",
       "optionally provide target/inventory.json only when it is sanitized and safe for this public repository"
     ],
     "run": [
+      "let the Page Composition Contract workflow build source-prediction visual targets and composition reports",
       "let the Elementor JSON QA workflow start from the main change or workflow_dispatch",
-      "resolve the resulting workflow run and require both Static JSON audit and Elementor runtime preview to complete successfully"
+      "resolve the resulting workflow runs and require the relevant jobs to complete successfully"
     ],
     "readback": [
+      "read visual-targets and composition-audit artifacts and confirm visual-target evidence_class=source_prediction and render_observed=false",
       "read static-audit and elementor-runtime-qa artifacts",
       "check dependency audit, runtime inventory, source/runtime/deep audits, importer roundtrip reports, render manifests and Elementor Pro status",
-      "inspect Chromium, Firefox and WebKit desktop/tablet/mobile screenshot metadata before making a browser claim",
+      "inspect Chromium, Firefox and WebKit desktop/tablet/mobile screenshot metadata including layout_snapshot before making a controlled-runtime browser/layout claim",
       "record open target, editor reopen/save/re-export, accessibility and staging tests separately"
     ],
     "iterate": [
       "on a confirmed source, dependency, importer, roundtrip or render defect, repair the canonical source and rerun",
-      "on a visual mismatch, edit the canonical JSON and compare the next screenshots",
-      "never convert controlled-runtime success into target_verified or production_observed without later evidence"
+      "on a visual mismatch, compare the whole-page visual-target model plus screenshot/layout snapshot, repair the smallest confirmed section cause, rebuild the whole-page target and rerun",
+      "never convert source-prediction or controlled-runtime success into target_verified or production_observed without later evidence"
     ]
   },
   "inputs": {
     "templates": "templates/*.json",
+    "design_intent": "sidecars/<template>.design-intent.json (optional and only when safe for this public repository)",
     "target_inventory": "target/inventory.json (optional and only when sanitized for a public repository; confidential inventories require a private controlled runtime)",
     "elementor_pro_secret": "ELEMENTOR_PRO_LICENSE_KEY (optional GitHub Actions secret; never commit the value)",
     "reference_visual": "kept outside this public repository when confidential; used by the calling assistant for comparison"
   },
   "baseline": {
-    "wordpress": "7.0.4",
+    "wordpress": "7.1",
     "php_series": "8.3",
-    "elementor_core": "4.2.3",
-    "hello_elementor": "3.4.9",
+    "elementor_core": "4.2.4",
+    "hello_elementor": "3.5.1",
     "node": "22",
     "dependency_policy": "direct npm versions are exact; npm audit blocks high/critical findings; a committed npm lockfile remains required for a fully immutable npm dependency graph; optional Elementor Pro is resolved from Elementor's official Composer repository per run unless an explicit version constraint is added, and the exact installed Pro version must be taken from runtime-inventory.json for any Pro-specific claim"
   },
   "pipeline": [
-    "validate this runtime contract",
+    "validate this runtime contract and repository contracts",
+    "build and schema-check a whole-page visual-target source prediction with explicit/declared/inferred/unknown provenance labels",
     "run source-level classic/widget auditor and deep Classic/Atomic structural validator",
-    "run validator and semantic-roundtrip unit tests",
+    "run validator, visual-target and semantic-roundtrip unit tests",
     "audit npm dependencies and fail on high/critical findings",
     "start pinned disposable WordPress/PHP with wp-env",
     "install pinned Elementor Core and Hello Elementor",
@@ -92,11 +99,14 @@
     "export the newest imported library item's semantic document data and compare it against source while ignoring only volatile element IDs",
     "audit the importer-produced JSON again",
     "render importer-produced JSON into isolated Elementor Canvas pages",
-    "run Chromium, Firefox and WebKit browser checks at desktop, tablet and mobile viewports with reduced-motion, console, request, image and overflow checks",
-    "upload audit reports, importer outputs, runtime inventory, render manifests, Pro status and screenshots as workflow artifacts",
+    "run Chromium, Firefox and WebKit browser checks at desktop, tablet, mobile and active breakpoint boundaries with reduced-motion, console, request, image and overflow checks",
+    "capture full-page screenshots plus DOM layout snapshots with element bounding boxes and computed layout/style properties",
+    "upload audit reports, visual targets, importer outputs, runtime inventory, render manifests, Pro status and screenshots/layout metadata as workflow artifacts",
     "deactivate the temporary Pro license when used and destroy the runtime"
   ],
   "outputs": [
+    "composition-audit",
+    "visual-targets",
     "static-audit",
     "elementor-runtime-qa/dependency-audit",
     "elementor-runtime-qa/runtime-inventory.json",
@@ -105,20 +115,24 @@
     "elementor-runtime-qa/imported-templates",
     "elementor-runtime-qa/render-manifests",
     "elementor-runtime-qa/elementor-pro-status.json",
-    "elementor-runtime-qa/screenshots",
+    "elementor-runtime-qa/screenshots with layout_snapshot metadata",
     "elementor-runtime-qa/playwright-report"
   ],
   "evidence": {
     "level": "controlled_runtime",
+    "source_prediction_level": "source_prediction",
     "can_support": [
+      "deterministic whole-page source prediction with explicit/declared/inferred/unknown provenance and unresolved-field disclosure",
       "Classic and documented Atomic source-structure validation within implemented validator scope",
       "runtime widget availability in the disposable environment",
       "successful Elementor Template Library importer acceptance",
       "semantic preservation of content and page_settings across importer storage while ignoring only volatile element IDs",
       "successful disposable WordPress/Elementor render of importer-produced JSON",
-      "Chromium, Firefox and WebKit checks at the configured desktop, tablet and mobile viewports"
+      "Chromium, Firefox and WebKit checks at the configured desktop, tablet, mobile and active breakpoint viewports",
+      "observed DOM bounding boxes and computed layout/style metadata for rendered Elementor elements in that disposable runtime"
     ],
     "does_not_prove": [
+      "the visual-target source prediction is a screenshot, browser observation or pixel-perfect truth",
       "exact customer staging compatibility",
       "target_verified status",
       "editor reopen/save or a target/UI re-export roundtrip",
@@ -131,8 +145,8 @@
     ]
   },
   "iteration": {
-    "on_failure": "Repair only confirmed JSON, dependency, importer, roundtrip or render defects; never invent unknown Atomic, Pro, add-on or site-object data; then rerun the same pipeline.",
-    "on_visual_mismatch": "Adjust the canonical JSON, rerun and compare new browser artifacts against the approved reference outside the public repository.",
+    "on_failure": "Repair only confirmed JSON, dependency, importer, roundtrip, render or layout defects; never invent unknown Atomic, Pro, add-on or site-object data; rebuild the whole-page visual target and rerun the same affected evidence layers.",
+    "on_visual_mismatch": "Compare the current whole-page visual-target prediction with screenshot and layout_snapshot evidence, adjust only the smallest confirmed section/component cause, then rebuild and rerun; keep already-passed scope frozen unless the change can affect it.",
     "formal_final_gate": "After the last implementation change, require two stable green final rounds for the covered controlled-runtime scope before handoff to staging/QA."
   },
   "privacy": {
