@@ -10,12 +10,21 @@ Before changing or running Elementor JSON work:
 
 1. Read `runtime-contract.json`.
 2. Read `docs/project-elementor-integration.md` when the task concerns routing, evidence, handoff, privacy or caller behavior.
-3. Treat the Elementor skill as domain owner for Elementor structure, dependencies, risk and JSON decisions.
+3. Treat the Elementor Skill as domain owner for Elementor structure, dependencies, risk, visual-target interpretation and JSON decisions.
 4. Treat `webactueel-workflow` as controller for canonical Project Elementor source writes, multi-owner work, rollback and formal scan-fix-retest workflows.
+
+## Visual Target contract
+
+- Build the whole-page Visual Target before section-level visual repair when the input is safe for this public repository.
+- Keep prediction provenance explicit: `explicit`, `declared`, `inferred`, `unknown`.
+- A generated Visual Target is always `source_prediction` with `render_observed=false`; never treat it as screenshot/browser/target proof.
+- Do not invent exact layout, spacing, typography, media or dynamic values that are absent from source/declared intent.
+- After a material JSON patch, rebuild the whole-page Visual Target before comparing the next render.
+- Prefer screenshot + DOM `layout_snapshot` evidence over visual intuition alone for observable geometry, while preserving the evidence boundary that controlled runtime is not target staging.
 
 ## Trigger contract
 
-Use this repository when Elementor JSON needs real disposable-runtime evidence, including widget/dependency scanning, rendering, responsive screenshots, Pro availability checks or import-behavior checks.
+Use this repository when Elementor JSON needs real disposable-runtime evidence, including widget/dependency scanning, Visual Target artifacts, rendering, responsive screenshots/layout snapshots, Pro availability checks or import-behavior checks.
 
 Do not turn a source-only task into a runtime run unless a runtime/visual claim is actually needed. Do not use this repository for production or live-site mutation.
 
@@ -47,17 +56,18 @@ For changes that affect JSON auditing or Python logic:
 python -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-For changes that affect the runtime contract, workflow, scanner plugin, rendering, Playwright tests or integration documentation, require the GitHub Actions workflow `Elementor JSON QA` to pass both jobs:
+For changes that affect Visual Target contracts/building, composition wiring, runtime contract, workflow, scanner plugin, rendering, Playwright tests or integration documentation, require the relevant GitHub Actions workflows to pass:
 
-- `Static JSON audit`
-- `Elementor runtime preview`
+- `Page Composition Contract` — repository contracts, composition lint and Visual Target artifacts;
+- `Elementor JSON QA` — `Static JSON audit` and `Elementor runtime preview`.
 
-The static job must validate `runtime-contract.json`. The runtime job must start WordPress/Elementor, export widget inventory, audit templates, render them, capture desktop/tablet/mobile screenshots and upload artifacts.
+The runtime job must start WordPress/Elementor, export widget inventory, audit/import/roundtrip templates, render them, capture desktop/tablet/mobile + active-breakpoint screenshots and layout metadata, and upload artifacts.
 
 ## Change rules
 
-- Keep `runtime-contract.json`, `README.md`, `docs/project-elementor-integration.md` and `.github/workflows/validate.yml` aligned.
+- Keep `runtime-contract.json`, `toolkit-contract.json`, README, `docs/project-elementor-integration.md`, contracts and workflows aligned.
 - Fail closed on unknown widgets, invalid JSON, failed render or failed browser tests.
 - Repair only confirmed defects. Do not guess unknown Atomic, Pro, add-on or site-bound data.
 - Keep Pro credentials outside the repository; `ELEMENTOR_PRO_LICENSE_KEY` may exist only as a GitHub Actions secret.
 - Preserve evidence boundaries in every report or documentation change.
+- After the final implementation change, require two stable green controlled-runtime final rounds before a release/staging handoff claim.
