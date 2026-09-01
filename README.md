@@ -1,5 +1,9 @@
 # Elementor JSON Lab
 
+> **Portfoliostatus:** Actief ondersteunend · private Elementor QA-runtime
+
+**Rol in het platform:** Elementor JSON Lab valideert en test Elementor JSON in een gecontroleerde runtime. De [Orchestrator](https://github.com/Yolol100/Orchestrator) gebruikt hiervoor uitsluitend de geregistreerde gecorreleerde request-file-route; resultaatacceptatie blijft bij de owning Elementor-workflow.
+
 Controlled-runtime QA for Elementor JSON. The repository validates source JSON, exercises Elementor's Template Library importer, compares importer storage semantically, renders the imported result in a pinned disposable WordPress/Elementor runtime, and runs responsive browser checks.
 
 `runtime-contract.json` is the machine-readable evidence contract. Project Elementor remains the domain owner; this repository is only the controlled-runtime capability.
