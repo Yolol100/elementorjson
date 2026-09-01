@@ -7,6 +7,7 @@
 - `contracts/design-intent.schema.json` — section roles/patterns, responsive transformation, proof metadata, baseline/version intent, density/component model, layout contract and unit strategy.
 - `contracts/content-contract.schema.json` — global constraints plus optional `required_sections`, section-level required/forbidden content, CTA rules, H1 count and proof policy.
 - `tools/audit_page_composition.py` — source-level lint for those contracts plus unit profiling and generic layout-risk heuristics.
+- `.github/workflows/composition-contract.yml` — dedicated source-level CI for contract/schema changes and every committed template.
 
 ```bash
 python tools/audit_page_composition.py page.json \
@@ -14,6 +15,17 @@ python tools/audit_page_composition.py page.json \
   --content-contract page.content-contract.json \
   --json-output composition-report.json
 ```
+
+## Repository sidecar convention
+
+Runtime templates stay in `templates/`. Optional sidecars stay in `sidecars/` so the Elementor runtime workflow never mistakes a design/content contract for an importable Elementor template.
+
+For `templates/homepage.json`, CI automatically looks for:
+
+- `sidecars/homepage.design-intent.json`
+- `sidecars/homepage.content-contract.json`
+
+The dedicated `Page Composition Contract` workflow is triggered by `contracts/**`, `sidecars/**`, `templates/**` and the composition tooling/tests. It validates repository wiring, runs regressions, then runs `audit_page_composition.py` for every template and attaches any matching sidecars. Contract-only changes therefore receive source-level composition QA without forcing an unrelated WordPress/browser runtime run.
 
 ## Briefing and baseline fields
 
