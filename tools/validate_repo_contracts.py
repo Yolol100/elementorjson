@@ -8,6 +8,7 @@ REQUIRED_TOOL_IDS = [
     "elementor-json-auditor",
     "deep-json-validator",
     "page-composition-auditor",
+    "visual-target-builder",
     "npm-audit",
     "wp-env",
     "elementor-core",
@@ -29,8 +30,10 @@ COMPOSITION_WORKFLOW_MARKERS = [
     "sidecars/**",
     "templates/**",
     "audit_page_composition.py",
+    "build_visual_target.py",
     ".design-intent.json",
     ".content-contract.json",
+    "visual-targets",
 ]
 
 
@@ -147,6 +150,28 @@ def validate_toolkit(value):
     return errors
 
 
+def validate_visual_target_schema(root: Path):
+    path = root / "contracts" / "visual-target.schema.json"
+    if not path.is_file():
+        return ["visual-target.schema.json: contract schema missing"]
+    value, errors = load_object(path)
+    if value is None:
+        return errors
+    required = value.get("required") if isinstance(value.get("required"), list) else []
+    for key in ["evidence_class", "render_observed", "sections"]:
+        if key not in required:
+            errors.append(f"visual-target.schema.json: required boundary missing: {key}")
+    properties = value.get("properties") if isinstance(value.get("properties"), dict) else {}
+    if properties.get("evidence_class", {}).get("const") != "source_prediction":
+        errors.append("visual-target.schema.json: evidence_class must be const source_prediction")
+    if properties.get("render_observed", {}).get("const") is not False:
+        errors.append("visual-target.schema.json: render_observed must be const false")
+    labels = properties.get("provenance_labels", {}).get("items", {}).get("enum", [])
+    if labels != ["explicit", "declared", "inferred", "unknown"]:
+        errors.append("visual-target.schema.json: provenance labels must remain explicit/declared/inferred/unknown")
+    return errors
+
+
 def validate_workflow_wiring(root: Path):
     errors = []
     composition_path = root / ".github" / "workflows" / "composition-contract.yml"
@@ -185,6 +210,7 @@ def validate_repository_contracts(root=Path(".")):
         errors.extend(validate_runtime(runtime))
     if toolkit is not None:
         errors.extend(validate_toolkit(toolkit))
+    errors.extend(validate_visual_target_schema(root))
     errors.extend(validate_workflow_wiring(root))
     return errors
 
