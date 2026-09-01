@@ -1,62 +1,56 @@
 # Project Elementor integration
 
-This repository is the Project Elementor `controlled_runtime` for source validation, official Elementor Template Library import, semantic importer roundtrip, runtime widget/dependency inspection, disposable rendering and cross-browser responsive evidence.
+This repository is the Project Elementor controlled-runtime capability for source validation, whole-page visual-target prediction, official Elementor Template Library import, semantic importer roundtrip, runtime widget/dependency inspection, disposable rendering and cross-browser responsive evidence.
 
-## Trigger
+## Ownership
 
-Use it when new or screenshot-reconstructed Elementor JSON needs importer/runtime/visual evidence; existing JSON changes structure, widgets, Atomic data, responsive behavior or dependencies; the user asks to test, scan, import, roundtrip, render, preview, screenshot, verify widgets or verify Pro; or a source-only result is about to receive a stronger runtime/importer/browser claim.
+The Elementor Skill remains domain owner. `webactueel-workflow` controls multi-owner/source-write/formal scan-fix-retest work. Website QA owns staging/live/browser acceptance beyond this disposable runtime. This repository never becomes the design owner.
 
-Skip it only for source-only explanation/planning without such a claim.
+## Whole-page Visual Target
 
-## Ownership and preflight
+For safe/sanitized Elementor JSON, run `tools/build_visual_target.py` before section-level repair. The builder reads the entire document, records section order and adjacency, extracts explicit source layout/style data, attaches safe declared design-intent when supplied, applies only low/medium-confidence structural role hints, and leaves unresolved properties unknown.
 
-The Elementor skill remains domain owner. `webactueel-workflow` controls multi-owner/source-write/formal scan-fix-retest work. This repository is a capability, not an owner.
+Every prediction uses one of four provenance labels:
 
-Before execution:
+- `explicit` — directly present in the Elementor JSON;
+- `declared` — supplied by the matching design-intent contract;
+- `inferred` — a bounded structural interpretation such as hero-like/CTA-like;
+- `unknown` — not established by source evidence.
 
-1. Classify artifact, editor family, dependency mode, target objects and risk.
-2. Keep unknown IDs, Dynamic Tags, Forms, Loops, queries, conditions, globals and add-on data unknown.
-3. Sanitize all inputs because the repository is public; confidential data requires a private runtime.
-4. Use `target/inventory.json` only when it is controlled and safe for public storage.
-5. Use `ELEMENTOR_PRO_LICENSE_KEY` only as an Actions secret when Pro coverage is required.
+The artifact is always `evidence_class=source_prediction` and `render_observed=false`. It is not browser proof and may not be promoted to pixel-perfect or target claims.
 
 ## Controlled-runtime chain
 
-The main workflow must:
+The paired workflows must:
 
-1. validate the runtime contract and unit tests;
-2. validate Classic/widget structure plus deep Atomic typed props/styles/repeater structure;
-3. use the committed npm lockfile via `npm ci` and block high/critical npm audit findings;
-4. start the pinned WordPress/PHP runtime and pinned Elementor Core/Hello versions;
-5. optionally install Pro from Elementor's official Composer repository;
-6. export and verify the actual runtime widget/control inventory;
-7. audit source JSON against runtime and optional sanitized target inventory;
-8. import as the wp-env administrator through Elementor's Template Library CLI;
-9. export importer storage and compare `content`/`page_settings` semantically, ignoring only proven importer-volatility/defaults;
-10. re-audit importer output and render the importer-produced JSON;
-11. run Chromium, Firefox and WebKit at desktop/tablet/mobile plus active breakpoint boundaries with reduced-motion/error/request/image/overflow/basic keyboard checks;
-12. upload all evidence and tear down the disposable runtime.
+1. validate repository/runtime/tool contracts;
+2. build and schema-check whole-page Visual Targets for committed sanitized templates;
+3. validate Classic/widget structure plus deep Atomic typed props/styles/repeater structure;
+4. audit optional design/content sidecars;
+5. run all regression tests;
+6. use the committed npm lockfile and block high/critical npm findings;
+7. start the pinned WordPress 7.1 / PHP 8.3 runtime;
+8. install Elementor Core 4.2.4 and Hello Elementor 3.5.1;
+9. optionally install Pro from Elementor's official Composer repository;
+10. export and verify actual runtime widget/control inventory;
+11. audit source JSON against runtime and optional safe target inventory;
+12. import through Elementor's Template Library CLI as administrator;
+13. export importer storage and compare semantic document data while ignoring only proven volatile normalization;
+14. re-audit importer output and render it;
+15. run Chromium, Firefox and WebKit at desktop/tablet/mobile plus active breakpoint boundaries;
+16. capture full-page screenshots plus DOM `layout_snapshot` metadata containing bounding boxes and computed layout/style values;
+17. upload evidence and tear down the disposable runtime.
 
-Source JSON remains stricter than importer storage. In particular, Atomic source elements require boolean `isInner`; the comparator/imported-output validator may accept only the proven importer omission equivalent to `isInner: false`. Explicit `true`, invalid types and site-bound references remain significant.
+## Closed-loop comparison
 
-## Readback and iteration
+Use the complete Visual Target as the predicted page model, then compare rendered screenshots/layout snapshots section by section and in whole-page context. Check alignment, widths/heights, parent ratios, direction/wrap, grid tracks, gaps, padding/margins, overflow, typography, visibility and breakpoint changes. A mismatch authorizes only the smallest confirmed repair. After a material patch, rebuild the whole-page Visual Target and rerun the affected evidence. Keep previous PASS scope frozen unless the patch can affect it.
 
-Require both `Static JSON audit` and `Elementor runtime preview` to succeed. Inspect dependency audit, runtime inventory, source/runtime/deep audits, importer roundtrip output, imported JSON, render manifests, Pro mode and browser artifacts. Repair only confirmed defects and rerun the same chain.
+Do not compare on visual intuition alone when exact DOM geometry exists. Do not treat DOM geometry as aesthetics or target-site proof; screenshots and human/AI visual review still matter.
 
-After the last implementation change, require two stable green final controlled-runtime rounds before a staging/release handoff.
+## Privacy and target boundaries
 
-## Evidence boundary
+The repository is public. Never commit confidential client JSON/screenshots, credentials, personal data, secret URLs or confidential inventories. Sensitive artifacts require a private runtime or exact site route. A green run remains controlled-runtime evidence only; it does not prove customer staging, target IDs/globals/conditions/dynamic values, production behavior, full accessibility or pixel-perfect equality without an approved reference.
 
-A green run may support only the covered `controlled_runtime` claims. It does not prove exact customer staging compatibility, `target_verified`, production behavior, editor UI reopen/save/re-export, site-specific IDs/globals/conditions/dynamic data, Pro when no Pro secret was present, pixel-perfect equality without an approved reference, or full accessibility/assistive-technology compliance.
+## Final gate
 
-Target/staging/live proof remains a separate `website-qa-checklist` gate. Custom WordPress code/integrations remain `wordpressqualityarchitect` scope.
-
-## Failure behavior
-
-Fail closed on invalid runtime contract, dependency audit failure, malformed Classic/Atomic source, unavailable widget, importer permission/import failure, semantic roundtrip drift outside the proven normalization set, importer-output audit failure, render failure or browser failure. Do not weaken source validation merely to accommodate importer storage normalization.
-
-## Privacy and secrets
-
-Never commit Elementor Pro keys, Composer auth, credentials, personal data, confidential client JSON/screenshots, private download URLs or confidential target inventories. Use Actions secrets for Pro credentials and a private runtime/repository for sensitive artifacts.
-
-`runtime-contract.json` is the canonical machine-readable form of this policy. If this document, README and that contract drift, repair the drift before making controlled-runtime claims.
+After the last implementation change, require two stable green final controlled-runtime rounds before staging/release handoff. For target or release claims, continue through `website-qa-checklist` rather than upgrading controlled-runtime evidence by wording.
