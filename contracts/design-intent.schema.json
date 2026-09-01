@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://webactueel.local/elementor/design-intent.schema.json",
+  "title": "Elementor page design intent",
+  "type": "object",
+  "required": ["schema_version", "sections"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "page_role": {"type": "string"},
+    "unit_strategy": {"enum": ["preserve-target", "relative-first", "target-defined"]},
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["section_id", "section_role", "selected_pattern"],
+        "properties": {
+          "section_id": {"type": "string", "minLength": 1},
+          "section_role": {"type": "string", "minLength": 1},
+          "selected_pattern": {"type": "string", "minLength": 1},
+          "visual_anchor": {"type": "string"},
+          "background_mode": {"type": "string"},
+          "alignment": {"type": "string"},
+          "adjacent_contrast": {"type": "boolean"},
+          "responsive_plan": {
+            "type": "object",
+            "properties": {
+              "desktop": {"type": "string"},
+              "tablet": {"type": "string"},
+              "mobile": {"type": "string"}
+            },
+            "additionalProperties": false
+          },
+          "proof_type": {
+            "oneOf": [
+              {"type": "string"},
+              {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+            ]
+          },
+          "proof_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type", "status"],
+              "properties": {
+                "type": {"enum": ["direct_testimonial", "customer_story", "third_party_rating", "customer_logo", "factual_client_mention"]},
+                "status": {"enum": ["verified", "supplied_unverified", "placeholder", "blocked"]},
+                "source": {"type": "string"},
+                "permission_confirmed": {"type": "boolean"}
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
