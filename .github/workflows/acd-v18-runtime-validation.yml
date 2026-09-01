@@ -1,0 +1,174 @@
+name: ACD v18 Runtime Validation
+
+on:
+  push:
+    branches:
+      - acd-v18-runtime-validation
+    paths:
+      - '.github/workflows/acd-v18-runtime-validation.yml'
+      - 'validation/acd-v18/**'
+
+permissions:
+  contents: read
+
+env:
+  ELEMENTOR_CORE_VERSION: '4.2.3'
+  HELLO_ELEMENTOR_VERSION: '3.4.9'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Reassemble validation artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p templates target artifacts/acd-v18 artifacts/screenshots
+          base64 -d validation/acd-v18/acd-homepage-b2b-v18.json.gz.b64 | gzip -d > templates/acd-homepage-b2b-v18.json
+          base64 -d validation/acd-v18/acd-homepage-b2b-v18.design-intent.json.gz.b64 | gzip -d > target/acd-homepage-b2b-v18.design-intent.json
+          base64 -d validation/acd-v18/acd-homepage-b2b-v18.content-contract.json.gz.b64 | gzip -d > target/acd-homepage-b2b-v18.content-contract.json
+          python -m json.tool templates/acd-homepage-b2b-v18.json >/dev/null
+          python -m json.tool target/acd-homepage-b2b-v18.design-intent.json >/dev/null
+          python -m json.tool target/acd-homepage-b2b-v18.content-contract.json >/dev/null
+          sha256sum templates/acd-homepage-b2b-v18.json target/acd-homepage-b2b-v18.*.json | tee artifacts/acd-v18/input-sha256.txt
+
+      - name: Composition proof and unit lint
+        run: >-
+          python tools/audit_page_composition.py
+          templates/acd-homepage-b2b-v18.json
+          --design-intent target/acd-homepage-b2b-v18.design-intent.json
+          --content-contract target/acd-homepage-b2b-v18.content-contract.json
+          --json-output artifacts/acd-v18/composition.json
+
+      - name: Static and deep JSON audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/audit_elementor_json.py templates/acd-homepage-b2b-v18.json --output artifacts/acd-v18/static.json
+          python tools/validate_elementor_deep.py templates/acd-homepage-b2b-v18.json --output artifacts/acd-v18/deep.json
+
+      - name: Install locked runtime tooling
+        run: npm ci --no-fund
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Prepare WordPress runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/templates
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/imported
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/manifests
+          cp templates/acd-homepage-b2b-v18.json wordpress-plugin/elementor-json-lab/.runtime/templates/
+          npx wp-env start
+
+      - name: Install Elementor runtime dependencies
+        shell: bash
+        env:
+          ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION" --activate
+          npx wp-env run cli wp plugin activate elementor-json-lab
+          npx wp-env run cli wp theme install hello-elementor -- --version="$HELLO_ELEMENTOR_VERSION" --activate
+          if [[ -n "${ELEMENTOR_PRO_LICENSE_KEY:-}" ]]; then
+            npx wp-env run cli composer config --global --auth http-basic.composer.elementor.com token "$ELEMENTOR_PRO_LICENSE_KEY"
+            npx wp-env run cli composer config repositories.elementor composer https://composer.elementor.com
+            npx wp-env run cli composer config --no-plugins allow-plugins.composer/installers true
+            npx wp-env run cli composer require composer/installers --no-interaction --no-progress
+            npx wp-env run cli composer require elementor/elementor-pro --no-interaction --no-progress
+            npx wp-env run cli wp plugin activate elementor-pro
+            npx wp-env run cli wp elementor-pro license activate "$ELEMENTOR_PRO_LICENSE_KEY"
+            printf '{"enabled":true}\n' > artifacts/acd-v18/elementor-pro-status.json
+          else
+            printf '{"enabled":false,"reason":"secret not configured"}\n' > artifacts/acd-v18/elementor-pro-status.json
+          fi
+          npx wp-env run cli wp rewrite structure '/%postname%/'
+          npx wp-env run cli wp rewrite flush --hard
+
+      - name: Export runtime inventory and audit widgets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp ejl inventory --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/inventory.json
+          cp wordpress-plugin/elementor-json-lab/.runtime/inventory.json artifacts/acd-v18/runtime-inventory.json
+          python tools/audit_elementor_json.py templates/acd-homepage-b2b-v18.json --inventory wordpress-plugin/elementor-json-lab/.runtime/inventory.json --output artifacts/acd-v18/runtime-audit.json
+
+      - name: Official import semantic roundtrip and render
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC='/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/acd-homepage-b2b-v18.json'
+          OUT='/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/imported/acd-homepage-b2b-v18.json'
+          npx wp-env run cli wp --user=admin elementor library import "$SRC" --returnType=ids
+          npx wp-env run cli wp --user=admin ejl export_library --source-template="$SRC" --output="$OUT"
+          python tools/compare_elementor_roundtrip.py templates/acd-homepage-b2b-v18.json wordpress-plugin/elementor-json-lab/.runtime/imported/acd-homepage-b2b-v18.json --output artifacts/acd-v18/roundtrip.json
+          python tools/validate_elementor_deep.py wordpress-plugin/elementor-json-lab/.runtime/imported/acd-homepage-b2b-v18.json --output artifacts/acd-v18/imported-deep.json
+          npx wp-env run cli wp --user=admin ejl render "$OUT" --slug=acd-homepage-b2b-v18 --page-template=elementor_canvas --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/manifests/acd-homepage-b2b-v18.json
+          cp wordpress-plugin/elementor-json-lab/.runtime/imported/acd-homepage-b2b-v18.json artifacts/acd-v18/imported.json
+          cp wordpress-plugin/elementor-json-lab/.runtime/manifests/acd-homepage-b2b-v18.json artifacts/acd-v18/render-manifest.json
+
+      - name: Responsive cross-browser screenshots
+        run: npm run test:visual
+
+      - name: Collect requested viewport evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          find artifacts/screenshots -maxdepth 1 -type f -print | sort > artifacts/acd-v18/screenshot-files.txt
+          python - <<'PY'
+          import json, pathlib, hashlib
+          root=pathlib.Path('artifacts/screenshots')
+          required={1440,768,390}
+          found=set(); reports=[]
+          for p in root.glob('acd-homepage-b2b-v18-*.json'):
+              d=json.loads(p.read_text())
+              w=int(d['viewport']['width']); found.add(w); reports.append(d)
+          missing=sorted(required-found)
+          assert not missing, f'missing requested viewport widths: {missing}; found={sorted(found)}'
+          for d in reports:
+              assert d['horizontal_overflow']['scrollWidth'] <= d['horizontal_overflow']['clientWidth'] + 1
+              assert not d['browser_errors'] and not d['console_errors'] and not d['failed_requests'] and not d['bad_responses']
+              assert not d['broken_images']
+          hashes=[]
+          for p in sorted(root.glob('acd-homepage-b2b-v18-*.png')):
+              hashes.append(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}")
+          pathlib.Path('artifacts/acd-v18/screenshot-sha256.txt').write_text('\n'.join(hashes)+'\n')
+          pathlib.Path('artifacts/acd-v18/requested-viewports.json').write_text(json.dumps({'required':sorted(required),'found':sorted(found)},indent=2)+'\n')
+          PY
+
+      - name: Upload ACD v18 runtime evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: acd-v18-runtime-evidence
+          path: artifacts
+          if-no-files-found: error
+
+      - name: Deactivate Elementor Pro license
+        if: always()
+        shell: bash
+        env:
+          ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
+        run: |
+          if [[ -n "${ELEMENTOR_PRO_LICENSE_KEY:-}" ]]; then
+            npx wp-env run cli wp plugin is-active elementor-pro >/dev/null 2>&1 && npx wp-env run cli wp elementor-pro license deactivate || true
+          fi
+
+      - name: Stop WordPress environment
+        if: always()
+        run: npx wp-env stop || true
