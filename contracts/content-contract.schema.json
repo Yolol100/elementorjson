@@ -9,8 +9,30 @@
     "must_include": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "must_not_include": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "claim_once": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "cta_once": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "preferred_ctas": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "required_audiences": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "required_h1_count": {"type": "integer", "minimum": 0},
+    "required_sections": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "section_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "section_id": {"type": "string", "minLength": 1},
+          "section_role": {"type": "string", "minLength": 1},
+          "required_claims": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "forbidden_content": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "required_ctas": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "audience_priority": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+        },
+        "anyOf": [
+          {"required": ["section_id"]},
+          {"required": ["section_role"]}
+        ],
+        "additionalProperties": false
+      }
+    },
     "proof_policy": {
       "type": "object",
       "properties": {
