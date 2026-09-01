@@ -7,6 +7,7 @@ from pathlib import Path
 REQUIRED_TOOL_IDS = [
     "elementor-json-auditor",
     "deep-json-validator",
+    "page-composition-auditor",
     "npm-audit",
     "wp-env",
     "elementor-core",
@@ -21,6 +22,15 @@ REQUIRED_NEGATIVE_EVIDENCE_MARKERS = [
     "target_verified",
     "production",
     "accessibility",
+]
+
+COMPOSITION_WORKFLOW_MARKERS = [
+    "contracts/**",
+    "sidecars/**",
+    "templates/**",
+    "audit_page_composition.py",
+    ".design-intent.json",
+    ".content-contract.json",
 ]
 
 
@@ -137,6 +147,26 @@ def validate_toolkit(value):
     return errors
 
 
+def validate_workflow_wiring(root: Path):
+    errors = []
+    composition_path = root / ".github" / "workflows" / "composition-contract.yml"
+    if not composition_path.is_file():
+        return ["composition-contract.yml: workflow missing"]
+    composition = composition_path.read_text(encoding="utf-8")
+    for marker in COMPOSITION_WORKFLOW_MARKERS:
+        if marker not in composition:
+            errors.append(f"composition-contract.yml: required wiring missing: {marker}")
+
+    toolkit_workflow_path = root / ".github" / "workflows" / "toolkit-contract.yml"
+    if not toolkit_workflow_path.is_file():
+        errors.append("toolkit-contract.yml: workflow missing")
+    else:
+        toolkit_workflow = toolkit_workflow_path.read_text(encoding="utf-8")
+        if "contracts/**" not in toolkit_workflow:
+            errors.append("toolkit-contract.yml: contract schema changes must trigger toolkit validation")
+    return errors
+
+
 def validate_repository_contracts(root=Path(".")):
     errors = []
     runtime_path = root / "runtime-contract.json"
@@ -155,6 +185,7 @@ def validate_repository_contracts(root=Path(".")):
         errors.extend(validate_runtime(runtime))
     if toolkit is not None:
         errors.extend(validate_toolkit(toolkit))
+    errors.extend(validate_workflow_wiring(root))
     return errors
 
 
