@@ -7,7 +7,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from validate_repo_contracts import validate_repository_contracts, validate_runtime, validate_toolkit, validate_workflow_wiring
+from validate_repo_contracts import (
+    validate_repository_contracts,
+    validate_runtime,
+    validate_toolkit,
+    validate_visual_target_schema,
+    validate_workflow_wiring,
+)
 
 
 class RepositoryContractTests(unittest.TestCase):
@@ -41,17 +47,37 @@ class RepositoryContractTests(unittest.TestCase):
 
     def test_toolkit_rejects_loss_of_mandatory_runtime_tools_and_assertions(self):
         toolkit = json.loads((ROOT / "toolkit-contract.json").read_text(encoding="utf-8"))
-        for missing_tool in ["page-composition-auditor", "npm-audit", "hello-elementor"]:
+        for missing_tool in ["visual-target-builder", "visual-target-validator", "page-composition-auditor", "npm-audit", "hello-elementor"]:
             mutated = copy.deepcopy(toolkit)
             mutated["tools"] = [item for item in mutated["tools"] if item.get("id") != missing_tool]
             mutated["usage_assertions"] = [item for item in mutated["usage_assertions"] if item.get("tool") != missing_tool]
-            errors = validate_toolkit(mutated)
+            errors = validate_toolkit(mutated, ROOT)
             self.assertTrue(any(missing_tool in error for error in errors), (missing_tool, errors))
 
-    def test_composition_workflow_covers_contracts_sidecars_and_auditor(self):
+    def test_toolkit_usage_assertions_are_checked_against_repo_files(self):
+        toolkit = json.loads((ROOT / "toolkit-contract.json").read_text(encoding="utf-8"))
+        mutated = copy.deepcopy(toolkit)
+        mutated["usage_assertions"][0]["contains"] = "__definitely_missing_wiring_marker__"
+        errors = validate_toolkit(mutated, ROOT)
+        self.assertTrue(any("usage assertion mismatch" in error for error in errors), errors)
+
+    def test_visual_target_schema_keeps_prediction_boundary(self):
+        self.assertEqual(validate_visual_target_schema(ROOT), [])
+        schema = json.loads((ROOT / "contracts" / "visual-target.schema.json").read_text(encoding="utf-8"))
+        self.assertEqual(schema["properties"]["evidence_class"]["const"], "source_prediction")
+        self.assertIs(schema["properties"]["render_observed"]["const"], False)
+        self.assertEqual(
+            schema["properties"]["provenance_labels"]["items"]["enum"],
+            ["explicit", "declared", "inferred", "unknown"],
+        )
+
+    def test_composition_workflow_covers_contracts_sidecars_auditor_and_visual_target(self):
         self.assertEqual(validate_workflow_wiring(ROOT), [])
         workflow = (ROOT / ".github" / "workflows" / "composition-contract.yml").read_text(encoding="utf-8")
-        for marker in ["contracts/**", "sidecars/**", "templates/**", "audit_page_composition.py", ".design-intent.json", ".content-contract.json"]:
+        for marker in [
+            "contracts/**", "sidecars/**", "templates/**", "audit_page_composition.py", "build_visual_target.py",
+            "validate_visual_target.py", ".design-intent.json", ".content-contract.json", "visual-targets",
+        ]:
             self.assertIn(marker, workflow)
 
     def test_toolkit_push_triggers_on_contract_and_sidecar_changes(self):

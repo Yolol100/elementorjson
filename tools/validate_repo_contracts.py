@@ -8,6 +8,8 @@ REQUIRED_TOOL_IDS = [
     "elementor-json-auditor",
     "deep-json-validator",
     "page-composition-auditor",
+    "visual-target-builder",
+    "visual-target-validator",
     "npm-audit",
     "wp-env",
     "elementor-core",
@@ -29,8 +31,11 @@ COMPOSITION_WORKFLOW_MARKERS = [
     "sidecars/**",
     "templates/**",
     "audit_page_composition.py",
+    "build_visual_target.py",
+    "validate_visual_target.py",
     ".design-intent.json",
     ".content-contract.json",
+    "visual-targets",
 ]
 
 
@@ -80,6 +85,8 @@ def validate_runtime(value):
     evidence = value.get("evidence") if isinstance(value.get("evidence"), dict) else {}
     if evidence.get("level") != "controlled_runtime":
         errors.append("runtime-contract.json: evidence.level must remain controlled_runtime")
+    if evidence.get("source_prediction_level") != "source_prediction":
+        errors.append("runtime-contract.json: evidence.source_prediction_level must remain source_prediction")
     does_not_prove = evidence.get("does_not_prove")
     if not isinstance(does_not_prove, list) or not does_not_prove or not all(isinstance(item, str) and item.strip() for item in does_not_prove):
         errors.append("runtime-contract.json: evidence.does_not_prove must remain a non-empty list of explicit limitations")
@@ -91,7 +98,7 @@ def validate_runtime(value):
     return errors
 
 
-def validate_toolkit(value):
+def validate_toolkit(value, root=Path(".")):
     errors = require_keys(
         "toolkit-contract.json",
         value,
@@ -126,11 +133,25 @@ def validate_toolkit(value):
     if not isinstance(assertions, list) or not assertions:
         errors.append("toolkit-contract.json: usage_assertions must be a non-empty list")
     else:
-        for assertion in assertions:
+        for index, assertion in enumerate(assertions):
             if not isinstance(assertion, dict) or not assertion.get("tool") or not assertion.get("path") or not assertion.get("contains"):
                 errors.append("toolkit-contract.json: every usage assertion must bind tool/path/contains")
                 continue
             assertion_tools.add(assertion["tool"])
+            assertion_path = root / assertion["path"]
+            if not assertion_path.is_file():
+                errors.append(f"toolkit-contract.json: usage assertion path missing at index {index}: {assertion['path']}")
+                continue
+            try:
+                text = assertion_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                errors.append(f"toolkit-contract.json: could not read usage assertion path {assertion['path']}: {exc}")
+                continue
+            if assertion["contains"] not in text:
+                errors.append(
+                    f"toolkit-contract.json: usage assertion mismatch for {assertion['tool']} in {assertion['path']}: "
+                    f"missing {assertion['contains']!r}"
+                )
         for required_tool in REQUIRED_TOOL_IDS:
             if required_tool not in assertion_tools:
                 errors.append(f"toolkit-contract.json: usage assertion missing for required tool: {required_tool}")
@@ -144,6 +165,28 @@ def validate_toolkit(value):
             errors.append("toolkit-contract.json: controlled-runtime staging/production boundary must remain explicit")
         if "accessibility" not in normalized_boundaries:
             errors.append("toolkit-contract.json: accessibility ownership boundary must remain explicit")
+    return errors
+
+
+def validate_visual_target_schema(root: Path):
+    path = root / "contracts" / "visual-target.schema.json"
+    if not path.is_file():
+        return ["visual-target.schema.json: contract schema missing"]
+    value, errors = load_object(path)
+    if value is None:
+        return errors
+    required = value.get("required") if isinstance(value.get("required"), list) else []
+    for key in ["evidence_class", "render_observed", "sections"]:
+        if key not in required:
+            errors.append(f"visual-target.schema.json: required boundary missing: {key}")
+    properties = value.get("properties") if isinstance(value.get("properties"), dict) else {}
+    if properties.get("evidence_class", {}).get("const") != "source_prediction":
+        errors.append("visual-target.schema.json: evidence_class must be const source_prediction")
+    if properties.get("render_observed", {}).get("const") is not False:
+        errors.append("visual-target.schema.json: render_observed must be const false")
+    labels = properties.get("provenance_labels", {}).get("items", {}).get("enum", [])
+    if labels != ["explicit", "declared", "inferred", "unknown"]:
+        errors.append("visual-target.schema.json: provenance labels must remain explicit/declared/inferred/unknown")
     return errors
 
 
@@ -184,7 +227,8 @@ def validate_repository_contracts(root=Path(".")):
     if runtime is not None:
         errors.extend(validate_runtime(runtime))
     if toolkit is not None:
-        errors.extend(validate_toolkit(toolkit))
+        errors.extend(validate_toolkit(toolkit, root))
+    errors.extend(validate_visual_target_schema(root))
     errors.extend(validate_workflow_wiring(root))
     return errors
 

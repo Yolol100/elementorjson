@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://webactueel.local/elementor/visual-target.schema.json",
+  "title": "Elementor visual target prediction contract",
+  "type": "object",
+  "required": ["schema_version", "status", "evidence_class", "render_observed", "sections"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "status": {"enum": ["pass", "warn", "fail"]},
+    "evidence_class": {"const": "source_prediction"},
+    "render_observed": {"const": false},
+    "claim_boundary": {"type": "string"},
+    "provenance_labels": {
+      "type": "array",
+      "items": {"enum": ["explicit", "declared", "inferred", "unknown"]},
+      "uniqueItems": true
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "name": {"type": ["string", "null"]},
+        "sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "whole_page": {
+      "type": "object",
+      "properties": {
+        "title": {"type": ["string", "null"]},
+        "document_type": {"type": ["string", "null"]},
+        "elementor_export_version": {"type": ["string", "number", "null"]},
+        "section_count": {"type": "integer", "minimum": 0},
+        "section_order": {"type": "array", "items": {"type": "string"}},
+        "widget_count": {"type": "integer", "minimum": 0},
+        "dynamic_sections": {"type": "array", "items": {"type": "string"}},
+        "model_rule": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["index", "section_id", "role_hint", "responsive", "atomic_style_rules", "content", "declared_intent", "adjacency", "unknowns", "prediction_confidence"],
+        "properties": {
+          "index": {"type": "integer", "minimum": 0},
+          "section_id": {"type": "string", "minLength": 1},
+          "el_type": {"type": ["string", "null"]},
+          "is_inner": {"type": ["boolean", "null"]},
+          "role_hint": {"$ref": "#/$defs/annotatedHint"},
+          "responsive": {
+            "type": "object",
+            "required": ["desktop", "tablet", "mobile"],
+            "properties": {
+              "desktop": {"$ref": "#/$defs/viewport"},
+              "tablet": {"$ref": "#/$defs/viewport"},
+              "mobile": {"$ref": "#/$defs/viewport"}
+            },
+            "additionalProperties": false
+          },
+          "atomic_style_rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["breakpoint", "state", "properties"],
+              "properties": {
+                "element_id": {"type": ["string", "null"]},
+                "element_type": {"type": ["string", "null"]},
+                "style_id": {"type": ["string", "null"]},
+                "style_type": {"type": ["string", "null"]},
+                "label": {"type": ["string", "null"]},
+                "breakpoint": {"type": ["string", "number", "null"]},
+                "state": {"type": ["string", "null"]},
+                "properties": {"type": "object", "additionalProperties": {"$ref": "#/$defs/annotatedValue"}}
+              },
+              "additionalProperties": false
+            }
+          },
+          "content": {"type": "object"},
+          "declared_intent": {"type": "object"},
+          "adjacency": {
+            "type": "object",
+            "properties": {
+              "previous_section_id": {"type": ["string", "null"]},
+              "next_section_id": {"type": ["string", "null"]}
+            },
+            "additionalProperties": false
+          },
+          "unknowns": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "prediction_confidence": {"enum": ["low", "medium", "high"]}
+        },
+        "additionalProperties": true
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {"code": {"type": "string"}, "message": {"type": "string"}},
+        "additionalProperties": true
+      }
+    },
+    "summary": {"type": "object"}
+  },
+  "$defs": {
+    "annotatedValue": {
+      "type": "object",
+      "required": ["value", "provenance"],
+      "properties": {
+        "value": {},
+        "provenance": {"enum": ["explicit", "declared", "inferred", "unknown"]},
+        "source_key": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "annotatedHint": {
+      "type": "object",
+      "required": ["value", "provenance", "confidence"],
+      "properties": {
+        "value": {"type": "string"},
+        "provenance": {"enum": ["explicit", "declared", "inferred", "unknown"]},
+        "confidence": {"enum": ["low", "medium", "high"]}
+      },
+      "additionalProperties": false
+    },
+    "viewport": {
+      "type": "object",
+      "required": ["layout", "style", "has_explicit_overrides"],
+      "properties": {
+        "layout": {"type": "object", "additionalProperties": {"$ref": "#/$defs/annotatedValue"}},
+        "style": {"type": "object", "additionalProperties": {"$ref": "#/$defs/annotatedValue"}},
+        "has_explicit_overrides": {"type": ["boolean", "null"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}
