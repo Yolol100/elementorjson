@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from validate_repo_contracts import validate_repository_contracts, validate_runtime, validate_toolkit
+from validate_repo_contracts import validate_repository_contracts, validate_runtime, validate_toolkit, validate_workflow_wiring
 
 
 class RepositoryContractTests(unittest.TestCase):
@@ -41,12 +41,23 @@ class RepositoryContractTests(unittest.TestCase):
 
     def test_toolkit_rejects_loss_of_mandatory_runtime_tools_and_assertions(self):
         toolkit = json.loads((ROOT / "toolkit-contract.json").read_text(encoding="utf-8"))
-        for missing_tool in ["npm-audit", "hello-elementor"]:
+        for missing_tool in ["page-composition-auditor", "npm-audit", "hello-elementor"]:
             mutated = copy.deepcopy(toolkit)
             mutated["tools"] = [item for item in mutated["tools"] if item.get("id") != missing_tool]
             mutated["usage_assertions"] = [item for item in mutated["usage_assertions"] if item.get("tool") != missing_tool]
             errors = validate_toolkit(mutated)
             self.assertTrue(any(missing_tool in error for error in errors), (missing_tool, errors))
+
+    def test_composition_workflow_covers_contracts_sidecars_and_auditor(self):
+        self.assertEqual(validate_workflow_wiring(ROOT), [])
+        workflow = (ROOT / ".github" / "workflows" / "composition-contract.yml").read_text(encoding="utf-8")
+        for marker in ["contracts/**", "sidecars/**", "templates/**", "audit_page_composition.py", ".design-intent.json", ".content-contract.json"]:
+            self.assertIn(marker, workflow)
+
+    def test_toolkit_push_triggers_on_contract_and_sidecar_changes(self):
+        workflow = (ROOT / ".github" / "workflows" / "toolkit-contract.yml").read_text(encoding="utf-8")
+        self.assertIn("contracts/**", workflow)
+        self.assertIn("sidecars/**", workflow)
 
 
 if __name__ == "__main__":
