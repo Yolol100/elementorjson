@@ -37,12 +37,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p templates target artifacts/acd-v18 artifacts/screenshots
-          base64 -d validation/acd-v18/acd-homepage-b2b-v18.json.gz.b64 | gzip -d > templates/acd-homepage-b2b-v18.json
+          cat validation/acd-v18/payload.part00 validation/acd-v18/payload.part01 validation/acd-v18/payload.part02 | base64 -d | gzip -d > templates/acd-homepage-b2b-v18.json
           base64 -d validation/acd-v18/acd-homepage-b2b-v18.design-intent.json.gz.b64 | gzip -d > target/acd-homepage-b2b-v18.design-intent.json
           base64 -d validation/acd-v18/acd-homepage-b2b-v18.content-contract.json.gz.b64 | gzip -d > target/acd-homepage-b2b-v18.content-contract.json
           python -m json.tool templates/acd-homepage-b2b-v18.json >/dev/null
           python -m json.tool target/acd-homepage-b2b-v18.design-intent.json >/dev/null
           python -m json.tool target/acd-homepage-b2b-v18.content-contract.json >/dev/null
+          test "$(sha256sum templates/acd-homepage-b2b-v18.json | cut -d' ' -f1)" = "38f038434185a4ff1ed5e41387e66d076c64c5e1297c508f2d855ecddf877aa7"
+          test "$(sha256sum target/acd-homepage-b2b-v18.design-intent.json | cut -d' ' -f1)" = "6ed9f3e114f8c8ea8b2629e7a24c66eb280af657f6878e53d8ee5b8296196e7c"
+          test "$(sha256sum target/acd-homepage-b2b-v18.content-contract.json | cut -d' ' -f1)" = "e3b5153e11d98ba7bb8aed8ea1e8902c1f920f8e8f5bc6a0fe861a7d487763f3"
           sha256sum templates/acd-homepage-b2b-v18.json target/acd-homepage-b2b-v18.*.json | tee artifacts/acd-v18/input-sha256.txt
 
       - name: Composition proof and unit lint
