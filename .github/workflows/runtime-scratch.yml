@@ -1,0 +1,166 @@
+name: Runtime Scratch ACD v18
+
+on:
+  push:
+    branches:
+      - runtime-scratch
+    paths:
+      - 'runtime-scratch/**'
+      - '.github/workflows/runtime-scratch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ELEMENTOR_CORE_VERSION: '4.2.3'
+  HELLO_ELEMENTOR_VERSION: '3.4.9'
+  TEMPLATE_SHA256: 'c2eee92429a220064e381f7dc8c0076e7e9f007f4acb6c2b819bdb3c7a94cbd2'
+
+jobs:
+  controlled-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Reconstruct exact template
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p templates artifacts/static artifacts/roundtrip artifacts/screenshots artifacts/layout
+          cat runtime-scratch/v18chunk_00.txt runtime-scratch/v18chunk_01.txt runtime-scratch/v18chunk_02.txt runtime-scratch/v18chunk_03_*.txt > templates/acd-homepage-b2b-v18.json
+          actual="$(sha256sum templates/acd-homepage-b2b-v18.json | awk '{print $1}')"
+          test "$actual" = "$TEMPLATE_SHA256"
+          python -m json.tool templates/acd-homepage-b2b-v18.json >/dev/null
+          printf '{"sha256":"%s","bytes":%s}\n' "$actual" "$(wc -c < templates/acd-homepage-b2b-v18.json)" > artifacts/template-integrity.json
+
+      - name: Static repository validators
+        run: |
+          python tools/audit_elementor_json.py templates/acd-homepage-b2b-v18.json --output artifacts/static/audit.json
+          python tools/validate_elementor_deep.py templates/acd-homepage-b2b-v18.json --output artifacts/static/deep.json
+
+      - name: Install locked tooling
+        run: npm ci --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare runtime mounts
+        run: |
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/templates
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/imported
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/manifests
+          cp templates/acd-homepage-b2b-v18.json wordpress-plugin/elementor-json-lab/.runtime/templates/
+
+      - name: Start WordPress runtime
+        run: npx wp-env start
+
+      - name: Install pinned Elementor runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION" --activate
+          npx wp-env run cli wp plugin activate elementor-json-lab
+          npx wp-env run cli wp theme install hello-elementor -- --version="$HELLO_ELEMENTOR_VERSION" --activate
+          npx wp-env run cli wp rewrite structure '/%postname%/'
+          npx wp-env run cli wp rewrite flush --hard
+
+      - name: Import export and render
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_path='/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/acd-homepage-b2b-v18.json'
+          imported_path='/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/imported/acd-homepage-b2b-v18.json'
+          manifest_path='/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/manifests/acd-homepage-b2b-v18.json'
+          npx wp-env run cli wp --user=admin elementor library import "$source_path" --returnType=ids
+          npx wp-env run cli wp --user=admin ejl export_library --source-template="$source_path" --output="$imported_path"
+          python tools/compare_elementor_roundtrip.py templates/acd-homepage-b2b-v18.json wordpress-plugin/elementor-json-lab/.runtime/imported/acd-homepage-b2b-v18.json --output artifacts/roundtrip/semantic.json
+          python tools/validate_elementor_deep.py wordpress-plugin/elementor-json-lab/.runtime/imported/acd-homepage-b2b-v18.json --output artifacts/roundtrip/deep.json
+          npx wp-env run cli wp --user=admin ejl render "$imported_path" --slug=acd-homepage-b2b-v18 --page-template=elementor_canvas --output="$manifest_path"
+          cp wordpress-plugin/elementor-json-lab/.runtime/manifests/acd-homepage-b2b-v18.json artifacts/render-manifest.json
+
+      - name: Two stable screenshot rounds at required widths
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const crypto = require('crypto');
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch();
+            const viewports = [
+              {name:'desktop', width:1440, height:900},
+              {name:'tablet', width:768, height:1024},
+              {name:'mobile', width:390, height:844},
+            ];
+            const all = {};
+            const hashes = {};
+            for (let round=1; round<=2; round++) {
+              all[`round${round}`] = {};
+              for (const vp of viewports) {
+                const page = await browser.newPage({viewport:{width:vp.width,height:vp.height}});
+                await page.emulateMedia({reducedMotion:'reduce'});
+                const response = await page.goto('http://127.0.0.1:8888/acd-homepage-b2b-v18/', {waitUntil:'networkidle'});
+                if (!response || !response.ok()) throw new Error(`HTTP failure ${vp.name}`);
+                await page.evaluate(() => document.fonts && document.fonts.ready);
+                await page.addStyleTag({content:'*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}'});
+                const metrics = await page.evaluate(() => {
+                  const root = document.documentElement;
+                  const body = document.body;
+                  const overflow = {scrollWidth:root.scrollWidth, clientWidth:root.clientWidth};
+                  const h1 = document.querySelectorAll('h1').length;
+                  const topSections = [...document.querySelectorAll('body .elementor > .elementor-element, body [data-elementor-type] > .elementor-element')]
+                    .slice(0, 30).map(el => {
+                      const r = el.getBoundingClientRect();
+                      return {id:el.id||'', x:Math.round(r.x), width:Math.round(r.width), height:Math.round(r.height)};
+                    });
+                  const outliers = [...document.querySelectorAll('body *')].filter(el => {
+                    const s = getComputedStyle(el); if (s.position === 'fixed') return false;
+                    const r = el.getBoundingClientRect();
+                    return r.width > 0 && (r.right > root.clientWidth + 2 || r.left < -2);
+                  }).slice(0,25).map(el => ({tag:el.tagName,id:el.id||'',cls:String(el.className||'').slice(0,120)}));
+                  return {overflow,h1,bodyHeight:body.scrollHeight,outliers,topSections};
+                });
+                if (metrics.overflow.scrollWidth > metrics.overflow.clientWidth + 1) throw new Error(`Horizontal overflow ${vp.name}: ${JSON.stringify(metrics.overflow)}`);
+                if (metrics.h1 !== 1) throw new Error(`Expected exactly one H1 at ${vp.name}, got ${metrics.h1}`);
+                const path = `artifacts/screenshots/round${round}-${vp.name}.png`;
+                await page.screenshot({path,fullPage:true,animations:'disabled'});
+                const digest = crypto.createHash('sha256').update(fs.readFileSync(path)).digest('hex');
+                hashes[`round${round}-${vp.name}`] = digest;
+                all[`round${round}`][vp.name] = {...metrics, screenshot:path, sha256:digest};
+                await page.close();
+              }
+            }
+            for (const vp of viewports) {
+              if (hashes[`round1-${vp.name}`] !== hashes[`round2-${vp.name}`]) {
+                throw new Error(`Screenshot rounds not stable for ${vp.name}`);
+              }
+            }
+            fs.writeFileSync('artifacts/layout/two-rounds.json', JSON.stringify({stable:true, viewports, rounds:all}, null, 2)+'\n');
+            await browser.close();
+          })().catch(err => { console.error(err); process.exit(1); });
+          NODE
+
+      - name: Upload controlled runtime evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: acd-v18-controlled-runtime
+          path: artifacts
+          if-no-files-found: error
+
+      - name: Stop WordPress environment
+        if: always()
+        run: npx wp-env stop || true
