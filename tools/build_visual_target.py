@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build a deterministic source-level visual target from Elementor JSON.
+"""Build a deterministic source-level Visual Target from Elementor JSON.
 
-The output is a prediction contract for ChatGPT/review tooling. It never claims
-that a browser actually rendered the predicted result. Values are labelled as
-explicit, declared, inferred, or unknown to keep uncertainty visible.
+The result is a whole-page source prediction. It never claims browser/render
+observation. Every predicted value keeps provenance as explicit, declared,
+inferred, or unknown; Atomic typed-prop metadata is preserved where present.
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 SCHEMA_VERSION = "1.0"
+PROVENANCE_LABELS = ["explicit", "declared", "inferred", "unknown"]
 TEXT_KEYS = {
     "title", "text", "editor", "description", "button_text", "heading", "paragraph",
     "ekit_funfact_title_text", "testimonial_content", "testimonial_name",
@@ -42,6 +43,35 @@ STYLE_KEYS = {
     "typography": ("typography_typography", "typography_font_family", "typography_font_size"),
 }
 RESPONSIVE_SUFFIXES = {"desktop": "", "tablet": "_tablet", "mobile": "_mobile"}
+ATOMIC_CANONICAL = {
+    "display": ("layout", "display"),
+    "flex-direction": ("layout", "direction"),
+    "flex_direction": ("layout", "direction"),
+    "justify-content": ("layout", "justify"),
+    "justify_content": ("layout", "justify"),
+    "align-items": ("layout", "align"),
+    "align_items": ("layout", "align"),
+    "flex-wrap": ("layout", "wrap"),
+    "flex_wrap": ("layout", "wrap"),
+    "gap": ("layout", "gap"),
+    "width": ("layout", "width"),
+    "min-height": ("layout", "min_height"),
+    "min_height": ("layout", "min_height"),
+    "grid-template-columns": ("layout", "grid_columns"),
+    "grid_template_columns": ("layout", "grid_columns"),
+    "position": ("layout", "position"),
+    "background-color": ("style", "background"),
+    "background_color": ("style", "background"),
+    "padding": ("style", "padding"),
+    "margin": ("style", "margin"),
+    "border-radius": ("style", "border_radius"),
+    "border_radius": ("style", "border_radius"),
+    "color": ("style", "color"),
+    "font-family": ("style", "typography"),
+    "font-size": ("style", "typography"),
+    "font-weight": ("style", "typography"),
+    "line-height": ("style", "typography"),
+}
 
 
 def _load(path: str | None) -> Any:
@@ -65,7 +95,7 @@ def _walk(node: Any) -> Iterable[dict[str, Any]]:
 
 
 def _unwrap(value: Any) -> Any:
-    """Unwrap common Atomic typed-property envelopes without inventing semantics."""
+    """Unwrap typed props for content inspection, not for Atomic provenance output."""
     if isinstance(value, dict):
         if "$$type" in value and "value" in value:
             typed = value.get("value")
@@ -84,9 +114,7 @@ def _unwrap(value: Any) -> Any:
 
 def _settings(node: dict[str, Any]) -> dict[str, Any]:
     raw = node.get("settings")
-    if isinstance(raw, dict):
-        return _unwrap(raw)
-    return {}
+    return _unwrap(raw) if isinstance(raw, dict) else {}
 
 
 def _first(settings: dict[str, Any], keys: Iterable[str], suffix: str = "") -> tuple[Any, str | None]:
@@ -105,7 +133,7 @@ def _value_repr(value: Any) -> Any:
             return f"{value.get('size')}{unit}"
         sides = {k: value.get(k) for k in ("top", "right", "bottom", "left") if k in value}
         if sides:
-            out = {k: v for k, v in sides.items()}
+            out = dict(sides)
             if unit:
                 out["unit"] = unit
             return out
@@ -114,6 +142,23 @@ def _value_repr(value: Any) -> Any:
     if isinstance(value, list):
         return value[:8]
     return value
+
+
+def _atomic_value_repr(value: Any) -> dict[str, Any]:
+    """Preserve Atomic type identity while exposing a compact comparable value."""
+    typed_type = None
+    raw = value
+    if isinstance(value, dict):
+        if "$$type" in value and "value" in value:
+            typed_type = str(value.get("$$type"))
+            raw = value.get("value")
+        elif "$type" in value and "value" in value:
+            typed_type = str(value.get("$type"))
+            raw = value.get("value")
+    out = {"value": _value_repr(raw), "provenance": "explicit"}
+    if typed_type:
+        out["typed_type"] = typed_type
+    return out
 
 
 def _extract_group(settings: dict[str, Any], mapping: dict[str, Iterable[str]], suffix: str = "") -> dict[str, Any]:
@@ -129,17 +174,16 @@ def _extract_group(settings: dict[str, Any], mapping: dict[str, Iterable[str]], 
 
 def _text_value(value: Any) -> str | None:
     value = _unwrap(value)
-    if isinstance(value, str):
-        text = re.sub(r"<[^>]+>", " ", value)
-        text = re.sub(r"\s+", " ", text).strip()
-        return text or None
-    return None
+    if not isinstance(value, str):
+        return None
+    text = re.sub(r"<[^>]+>", " ", value)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or None
 
 
 def _node_text(node: dict[str, Any]) -> list[str]:
-    settings = _settings(node)
     parts: list[str] = []
-    for key, value in settings.items():
+    for key, value in _settings(node).items():
         if key in TEXT_KEYS:
             text = _text_value(value)
             if text:
@@ -147,28 +191,30 @@ def _node_text(node: dict[str, Any]) -> list[str]:
     return parts
 
 
+def _iter_named_objects(value: Any, fallback_prefix: str) -> Iterable[dict[str, Any]]:
+    """Accept Elementor list/object container variants without normalizing source bytes."""
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                yield item
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if isinstance(item, dict):
+                copied = dict(item)
+                copied.setdefault("id", str(key) if key else fallback_prefix)
+                yield copied
+
+
 def _atomic_style_rules(section: dict[str, Any]) -> list[dict[str, Any]]:
-    """Preserve Atomic style variants as explicit source without guessing CSS meaning."""
     rules: list[dict[str, Any]] = []
     for node in _walk(section):
-        styles = node.get("styles") if isinstance(node, dict) else None
-        if not isinstance(styles, list):
+        if not isinstance(node, dict):
             continue
-        for style in styles:
-            if not isinstance(style, dict):
-                continue
+        for style in _iter_named_objects(node.get("styles"), "style"):
             variants = style.get("variants")
-            if not isinstance(variants, list):
-                continue
-            for variant in variants:
-                if not isinstance(variant, dict):
-                    continue
+            for variant in _iter_named_objects(variants, "variant"):
                 meta = variant.get("meta") if isinstance(variant.get("meta"), dict) else {}
                 props = variant.get("props") if isinstance(variant.get("props"), dict) else {}
-                rendered_props = {
-                    str(key): {"value": _value_repr(value), "provenance": "explicit"}
-                    for key, value in list(props.items())[:80]
-                }
                 rules.append({
                     "element_id": str(node.get("id")) if node.get("id") is not None else None,
                     "element_type": node.get("elType") or node.get("widgetType"),
@@ -177,11 +223,33 @@ def _atomic_style_rules(section: dict[str, Any]) -> list[dict[str, Any]]:
                     "label": style.get("label"),
                     "breakpoint": meta.get("breakpoint") or "desktop",
                     "state": meta.get("state") or "normal",
-                    "properties": rendered_props,
+                    "properties": {str(k): _atomic_value_repr(v) for k, v in list(props.items())[:80]},
                 })
                 if len(rules) >= 120:
                     return rules
     return rules
+
+
+def _custom_responsive_controls(settings: dict[str, Any]) -> list[dict[str, Any]]:
+    known_bases = sorted({key for keys in (*LAYOUT_KEYS.values(), *STYLE_KEYS.values()) for key in keys}, key=len, reverse=True)
+    result: list[dict[str, Any]] = []
+    for key, value in settings.items():
+        if value in (None, "", [], {}):
+            continue
+        for base in known_bases:
+            prefix = base + "_"
+            if key.startswith(prefix):
+                suffix = key[len(prefix):]
+                if suffix not in {"tablet", "mobile"}:
+                    result.append({
+                        "control": base,
+                        "breakpoint_suffix": suffix,
+                        "source_key": key,
+                        "value": _value_repr(value),
+                        "provenance": "explicit",
+                    })
+                break
+    return result[:80]
 
 
 def _content_summary(section: dict[str, Any]) -> dict[str, Any]:
@@ -189,10 +257,11 @@ def _content_summary(section: dict[str, Any]) -> dict[str, Any]:
     text: list[str] = []
     media: list[dict[str, Any]] = []
     dynamic_markers: list[str] = []
+    reference_markers: list[str] = []
     element_count = 0
     max_depth = 0
 
-    def visit(node: Any, depth: int = 0):
+    def visit(node: Any, depth: int = 0) -> None:
         nonlocal element_count, max_depth
         if not isinstance(node, dict):
             return
@@ -207,8 +276,11 @@ def _content_summary(section: dict[str, Any]) -> dict[str, Any]:
             if key in MEDIA_KEYS and value not in (None, "", [], {}):
                 media.append({"key": key, "value": _value_repr(value)})
             rendered = json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else str(value)
-            if "dynamic" in key.lower() or "dynamic" in rendered.lower() or "{{" in rendered:
+            lowered = key.lower()
+            if "dynamic" in lowered or "dynamic" in rendered.lower() or "{{" in rendered:
                 dynamic_markers.append(key)
+            if key == "__globals__" or "global" in lowered or "variable" in lowered or "class" in lowered:
+                reference_markers.append(key)
         for child in node.get("elements", []) if isinstance(node.get("elements"), list) else []:
             visit(child, depth + 1)
 
@@ -221,6 +293,7 @@ def _content_summary(section: dict[str, Any]) -> dict[str, Any]:
         "text_snippets": text[:8],
         "media": media[:8],
         "dynamic_keys": sorted(set(dynamic_markers))[:12],
+        "external_reference_keys": sorted(set(reference_markers))[:12],
     }
 
 
@@ -252,25 +325,19 @@ def _responsive(settings: dict[str, Any]) -> dict[str, Any]:
     for viewport, suffix in RESPONSIVE_SUFFIXES.items():
         layout = _extract_group(settings, LAYOUT_KEYS, suffix)
         style = _extract_group(settings, STYLE_KEYS, suffix)
-        explicit = any(v.get("provenance") == "explicit" for v in layout.values()) or any(
-            v.get("provenance") == "explicit" for v in style.values()
-        )
-        result[viewport] = {
-            "layout": layout,
-            "style": style,
-            "has_explicit_overrides": explicit if suffix else None,
-        }
+        explicit = any(v.get("provenance") == "explicit" for v in layout.values()) or any(v.get("provenance") == "explicit" for v in style.values())
+        result[viewport] = {"layout": layout, "style": style, "has_explicit_overrides": explicit if suffix else None}
     return result
 
 
 def _intent_map(intent: Any) -> dict[str, dict[str, Any]]:
     if not isinstance(intent, dict):
         return {}
-    out = {}
-    for section in intent.get("sections", []) if isinstance(intent.get("sections"), list) else []:
-        if isinstance(section, dict) and section.get("section_id"):
-            out[str(section["section_id"])] = section
-    return out
+    return {
+        str(section["section_id"]): section
+        for section in intent.get("sections", []) if isinstance(intent.get("sections"), list)
+        if isinstance(section, dict) and section.get("section_id")
+    }
 
 
 def _apply_intent(section_target: dict[str, Any], declared: dict[str, Any] | None) -> None:
@@ -279,51 +346,73 @@ def _apply_intent(section_target: dict[str, Any], declared: dict[str, Any] | Non
     for field in ("section_role", "selected_pattern", "visual_anchor", "background_mode", "alignment", "density", "component_model", "cta_tier"):
         if declared.get(field) not in (None, ""):
             section_target["declared_intent"][field] = {"value": declared[field], "provenance": "declared"}
-    if isinstance(declared.get("responsive_plan"), dict):
-        section_target["declared_intent"]["responsive_plan"] = {"value": declared["responsive_plan"], "provenance": "declared"}
-    if isinstance(declared.get("layout_contract"), dict):
-        section_target["declared_intent"]["layout_contract"] = {"value": declared["layout_contract"], "provenance": "declared"}
+    for field in ("responsive_plan", "layout_contract", "component_tokens"):
+        if isinstance(declared.get(field), dict):
+            section_target["declared_intent"][field] = {"value": declared[field], "provenance": "declared"}
+
+
+def _atomic_resolved_slots(rules: list[dict[str, Any]], breakpoint: str = "desktop") -> set[tuple[str, str]]:
+    slots: set[tuple[str, str]] = set()
+    for rule in rules:
+        bp = str(rule.get("breakpoint") or "desktop").lower()
+        state = str(rule.get("state") or "normal").lower()
+        if bp != breakpoint or state not in {"normal", "default", ""}:
+            continue
+        for prop in rule.get("properties", {}):
+            canonical = ATOMIC_CANONICAL.get(str(prop).lower())
+            if canonical:
+                slots.add(canonical)
+    return slots
 
 
 def _unknowns(section_target: dict[str, Any]) -> list[str]:
-    items = []
+    items: list[str] = []
+    atomic_slots = _atomic_resolved_slots(section_target.get("atomic_style_rules", []), "desktop")
     desktop = section_target["responsive"]["desktop"]
+    critical = {"direction", "justify", "align", "gap", "width", "background", "padding"}
     for group_name in ("layout", "style"):
-        group = desktop[group_name]
-        for key, item in group.items():
-            if item.get("provenance") == "unknown" and key in {"direction", "justify", "align", "gap", "width", "background", "padding"}:
+        for key, item in desktop[group_name].items():
+            if key in critical and item.get("provenance") == "unknown" and (group_name, key) not in atomic_slots:
                 items.append(f"desktop.{group_name}.{key}")
     if section_target["content"]["dynamic_keys"]:
         items.append("dynamic-content-runtime-value")
-    if section_target["content"]["media"]:
-        for item in section_target["content"]["media"]:
-            if isinstance(item.get("value"), dict) and item["value"].get("id") and not item["value"].get("url"):
-                items.append("media-id-without-rendered-url")
-                break
+    if section_target["content"]["external_reference_keys"]:
+        items.append("global-or-design-system-runtime-reference")
+    for item in section_target["content"]["media"]:
+        if isinstance(item.get("value"), dict) and item["value"].get("id") and not item["value"].get("url"):
+            items.append("media-id-without-rendered-url")
+            break
     return sorted(set(items))
+
+
+def _page_settings_summary(template: dict[str, Any]) -> dict[str, Any]:
+    raw = template.get("page_settings")
+    if isinstance(raw, dict):
+        return {str(k): _value_repr(v) for k, v in list(raw.items())[:80]}
+    return {}
+
+
+def _failure(code: str, message: str) -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "status": "fail",
+        "evidence_class": "source_prediction",
+        "render_observed": False,
+        "provenance_labels": PROVENANCE_LABELS,
+        "warnings": [{"code": code, "message": message}],
+        "sections": [],
+    }
 
 
 def build_visual_target(template: Any, intent: Any = None, source_name: str | None = None, source_sha256: str | None = None) -> dict[str, Any]:
     warnings: list[dict[str, str]] = []
     if not isinstance(template, dict):
-        return {
-            "schema_version": SCHEMA_VERSION,
-            "status": "fail",
-            "evidence_class": "source_prediction",
-            "render_observed": False,
-            "warnings": [{"code": "invalid_root", "message": "Elementor JSON root must be an object."}],
-            "sections": [],
-        }
+        return _failure("invalid_root", "Elementor JSON root must be an object.")
     content = template.get("content", [])
     if not isinstance(content, list):
-        return {
-            "schema_version": SCHEMA_VERSION,
-            "status": "fail",
-            "evidence_class": "source_prediction",
-            "render_observed": False,
-            "warnings": [{"code": "invalid_content", "message": "Elementor JSON content must be an array."}],
-            "sections": [],
-        }
+        return _failure("invalid_content", "Elementor JSON content must be an array.")
+    if not content:
+        warnings.append({"code": "empty_content", "message": "Elementor JSON contains no top-level content elements."})
 
     ids = [str(x.get("id")) for x in content if isinstance(x, dict) and x.get("id")]
     duplicates = sorted(k for k, v in Counter(ids).items() if v > 1)
@@ -348,6 +437,7 @@ def build_visual_target(template: Any, intent: Any = None, source_name: str | No
             "is_inner": section.get("isInner"),
             "role_hint": {"value": role, "provenance": role_provenance, "confidence": role_confidence},
             "responsive": _responsive(settings),
+            "custom_responsive_controls": _custom_responsive_controls(settings),
             "atomic_style_rules": _atomic_style_rules(section),
             "content": csummary,
             "declared_intent": {},
@@ -360,12 +450,11 @@ def build_visual_target(template: Any, intent: Any = None, source_name: str | No
         _apply_intent(target, intent_by_id.get(sid))
         target["unknowns"] = _unknowns(target)
         explicit_count = sum(
-            1
-            for viewport in target["responsive"].values()
+            1 for viewport in target["responsive"].values()
             for group in (viewport["layout"], viewport["style"])
-            for item in group.values()
-            if item.get("provenance") == "explicit"
+            for item in group.values() if item.get("provenance") == "explicit"
         )
+        explicit_count += len(target["custom_responsive_controls"])
         explicit_count += sum(len(rule.get("properties", {})) for rule in target["atomic_style_rules"])
         target["prediction_confidence"] = "high" if explicit_count >= 6 else "medium" if explicit_count >= 2 else "low"
         sections.append(target)
@@ -374,11 +463,13 @@ def build_visual_target(template: Any, intent: Any = None, source_name: str | No
         "title": template.get("title"),
         "document_type": template.get("type"),
         "elementor_export_version": template.get("version"),
+        "page_settings": _page_settings_summary(template),
         "section_count": len(sections),
         "section_order": [s["section_id"] for s in sections],
         "widget_count": sum(len(s["content"]["widget_types"]) for s in sections),
         "dynamic_sections": [s["section_id"] for s in sections if s["content"]["dynamic_keys"]],
-        "model_rule": "Whole-page model is assembled first; section predictions are then checked in page order and against adjacent sections.",
+        "reference_dependent_sections": [s["section_id"] for s in sections if s["content"]["external_reference_keys"]],
+        "model_rule": "Whole-page model is assembled first; section predictions are then checked in page order and against adjacent/shared context.",
     }
     unresolved = sum(len(s["unknowns"]) for s in sections)
     status = "warn" if warnings or unresolved else "pass"
@@ -388,7 +479,7 @@ def build_visual_target(template: Any, intent: Any = None, source_name: str | No
         "evidence_class": "source_prediction",
         "render_observed": False,
         "claim_boundary": "This artifact predicts structure/appearance from source and declared intent; it is not screenshot, browser, staging, target or production proof.",
-        "provenance_labels": ["explicit", "declared", "inferred", "unknown"],
+        "provenance_labels": PROVENANCE_LABELS,
         "source": {"name": source_name, "sha256": source_sha256},
         "whole_page": whole_page,
         "sections": sections,
@@ -410,18 +501,9 @@ def main() -> int:
     args = parser.parse_args()
     template_path = Path(args.template)
     try:
-        template = _load(args.template)
-        intent = _load(args.design_intent)
-        result = build_visual_target(template, intent, template_path.name, _sha256(template_path))
+        result = build_visual_target(_load(args.template), _load(args.design_intent), template_path.name, _sha256(template_path))
     except (OSError, json.JSONDecodeError) as exc:
-        result = {
-            "schema_version": SCHEMA_VERSION,
-            "status": "fail",
-            "evidence_class": "source_prediction",
-            "render_observed": False,
-            "warnings": [{"code": "unreadable_input", "message": str(exc)}],
-            "sections": [],
-        }
+        result = _failure("unreadable_input", str(exc))
     payload = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)
