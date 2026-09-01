@@ -41,7 +41,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["index", "section_id", "role_hint", "responsive", "content", "declared_intent", "adjacency", "unknowns", "prediction_confidence"],
+        "required": ["index", "section_id", "role_hint", "responsive", "atomic_style_rules", "content", "declared_intent", "adjacency", "unknowns", "prediction_confidence"],
         "properties": {
           "index": {"type": "integer", "minimum": 0},
           "section_id": {"type": "string", "minLength": 1},
@@ -57,6 +57,24 @@
               "mobile": {"$ref": "#/$defs/viewport"}
             },
             "additionalProperties": false
+          },
+          "atomic_style_rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["breakpoint", "state", "properties"],
+              "properties": {
+                "element_id": {"type": ["string", "null"]},
+                "element_type": {"type": ["string", "null"]},
+                "style_id": {"type": ["string", "null"]},
+                "style_type": {"type": ["string", "null"]},
+                "label": {"type": ["string", "null"]},
+                "breakpoint": {"type": ["string", "number", "null"]},
+                "state": {"type": ["string", "null"]},
+                "properties": {"type": "object", "additionalProperties": {"$ref": "#/$defs/annotatedValue"}}
+              },
+              "additionalProperties": false
+            }
           },
           "content": {"type": "object"},
           "declared_intent": {"type": "object"},
