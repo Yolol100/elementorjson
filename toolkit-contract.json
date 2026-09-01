@@ -10,6 +10,7 @@
   "tools": [
     {"id":"elementor-json-auditor","version":"repo","trigger_when":"templates are supplied","outputs":["artifacts/static-audit","artifacts/runtime-audit"]},
     {"id":"deep-json-validator","version":"repo","trigger_when":"templates are supplied","outputs":["deep validation reports"]},
+    {"id":"page-composition-auditor","version":"repo","trigger_when":"templates or optional design/content sidecars are supplied","outputs":["artifacts/composition-audit"]},
     {"id":"npm-audit","version":"runner-node","trigger_when":"every runtime preview","outputs":["artifacts/dependency-audit/npm-audit.json"]},
     {"id":"wp-env","version":"11.11.0","trigger_when":"runtime evidence is required","outputs":["controlled WordPress runtime"]},
     {"id":"elementor-core","version":"4.2.3","trigger_when":"runtime evidence is required","outputs":["runtime inventory and imports"]},
@@ -21,6 +22,7 @@
   "usage_assertions": [
     {"tool":"elementor-json-auditor","path":".github/workflows/validate.yml","contains":"audit_elementor_json.py"},
     {"tool":"deep-json-validator","path":".github/workflows/validate.yml","contains":"validate_elementor_deep.py"},
+    {"tool":"page-composition-auditor","path":".github/workflows/composition-contract.yml","contains":"audit_page_composition.py"},
     {"tool":"npm-audit","path":".github/workflows/validate.yml","contains":"npm audit --audit-level=high"},
     {"tool":"wp-env","path":"package.json","contains":"\"@wordpress/env\": \"11.11.0\""},
     {"tool":"elementor-core","path":".github/workflows/validate.yml","contains":"ELEMENTOR_CORE_VERSION: '4.2.3'"},
