@@ -147,6 +147,43 @@ def _node_text(node: dict[str, Any]) -> list[str]:
     return parts
 
 
+def _atomic_style_rules(section: dict[str, Any]) -> list[dict[str, Any]]:
+    """Preserve Atomic style variants as explicit source without guessing CSS meaning."""
+    rules: list[dict[str, Any]] = []
+    for node in _walk(section):
+        styles = node.get("styles") if isinstance(node, dict) else None
+        if not isinstance(styles, list):
+            continue
+        for style in styles:
+            if not isinstance(style, dict):
+                continue
+            variants = style.get("variants")
+            if not isinstance(variants, list):
+                continue
+            for variant in variants:
+                if not isinstance(variant, dict):
+                    continue
+                meta = variant.get("meta") if isinstance(variant.get("meta"), dict) else {}
+                props = variant.get("props") if isinstance(variant.get("props"), dict) else {}
+                rendered_props = {
+                    str(key): {"value": _value_repr(value), "provenance": "explicit"}
+                    for key, value in list(props.items())[:80]
+                }
+                rules.append({
+                    "element_id": str(node.get("id")) if node.get("id") is not None else None,
+                    "element_type": node.get("elType") or node.get("widgetType"),
+                    "style_id": style.get("id"),
+                    "style_type": style.get("type"),
+                    "label": style.get("label"),
+                    "breakpoint": meta.get("breakpoint") or "desktop",
+                    "state": meta.get("state") or "normal",
+                    "properties": rendered_props,
+                })
+                if len(rules) >= 120:
+                    return rules
+    return rules
+
+
 def _content_summary(section: dict[str, Any]) -> dict[str, Any]:
     widget_types: list[str] = []
     text: list[str] = []
@@ -311,6 +348,7 @@ def build_visual_target(template: Any, intent: Any = None, source_name: str | No
             "is_inner": section.get("isInner"),
             "role_hint": {"value": role, "provenance": role_provenance, "confidence": role_confidence},
             "responsive": _responsive(settings),
+            "atomic_style_rules": _atomic_style_rules(section),
             "content": csummary,
             "declared_intent": {},
             "adjacency": {
@@ -328,6 +366,7 @@ def build_visual_target(template: Any, intent: Any = None, source_name: str | No
             for item in group.values()
             if item.get("provenance") == "explicit"
         )
+        explicit_count += sum(len(rule.get("properties", {})) for rule in target["atomic_style_rules"])
         target["prediction_confidence"] = "high" if explicit_count >= 6 else "medium" if explicit_count >= 2 else "low"
         sections.append(target)
 
