@@ -49,9 +49,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ELEMENTOR_CORE_VERSION: '4.2.3'
-  HELLO_ELEMENTOR_VERSION: '3.4.9'
-  EXPECTED_WORDPRESS_VERSION: '7.0.4'
+  ELEMENTOR_CORE_VERSION: '4.2.4'
+  HELLO_ELEMENTOR_VERSION: '3.5.1'
+  EXPECTED_WORDPRESS_VERSION: '7.1'
   EXPECTED_PHP_SERIES: '8.3'
 
 jobs:
@@ -79,6 +79,7 @@ jobs:
           assert data['workflow'] == '.github/workflows/validate.yml'
           assert data['role'] == 'controlled_runtime'
           assert data['evidence']['level'] == 'controlled_runtime'
+          assert data['evidence']['source_prediction_level'] == 'source_prediction'
           assert data['trigger']['required_when']
           assert data['trigger']['forbidden_when']
           assert data['caller']['project'] == 'project-elementor'
@@ -330,7 +331,7 @@ jobs:
               --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/manifests/$slug.json"
           done
 
-      - name: Capture cross-browser responsive screenshots
+      - name: Capture cross-browser responsive screenshots and DOM layout snapshots
         run: npm run test:visual
 
       - name: Collect runtime metadata
