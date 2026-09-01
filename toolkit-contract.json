@@ -12,6 +12,7 @@
     {"id":"deep-json-validator","version":"repo","trigger_when":"templates are supplied","outputs":["deep validation reports"]},
     {"id":"page-composition-auditor","version":"repo","trigger_when":"templates or optional design/content sidecars are supplied","outputs":["artifacts/composition-audit"]},
     {"id":"visual-target-builder","version":"repo","trigger_when":"Elementor JSON is supplied and a whole-page visual model is needed","outputs":["artifacts/visual-targets"]},
+    {"id":"visual-target-validator","version":"repo","trigger_when":"a visual-target artifact is generated","outputs":["fail-closed source-prediction contract result"]},
     {"id":"npm-audit","version":"runner-node","trigger_when":"every runtime preview","outputs":["artifacts/dependency-audit/npm-audit.json"]},
     {"id":"wp-env","version":"11.11.0","trigger_when":"runtime evidence is required","outputs":["controlled WordPress runtime"]},
     {"id":"elementor-core","version":"4.2.4","trigger_when":"runtime evidence is required","outputs":["runtime inventory and imports"]},
@@ -25,6 +26,7 @@
     {"tool":"deep-json-validator","path":".github/workflows/validate.yml","contains":"validate_elementor_deep.py"},
     {"tool":"page-composition-auditor","path":".github/workflows/composition-contract.yml","contains":"audit_page_composition.py"},
     {"tool":"visual-target-builder","path":".github/workflows/composition-contract.yml","contains":"build_visual_target.py"},
+    {"tool":"visual-target-validator","path":".github/workflows/composition-contract.yml","contains":"validate_visual_target.py"},
     {"tool":"npm-audit","path":".github/workflows/validate.yml","contains":"npm audit --audit-level=high"},
     {"tool":"wp-env","path":"package.json","contains":"\"@wordpress/env\": \"11.11.0\""},
     {"tool":"elementor-core","path":".github/workflows/validate.yml","contains":"ELEMENTOR_CORE_VERSION: '4.2.4'"},
@@ -34,7 +36,7 @@
     {"tool":"playwright","path":"package.json","contains":"\"@playwright/test\": \"1.61.1\""}
   ],
   "boundaries": [
-    "The visual-target builder is source_prediction only: explicit/declared/inferred/unknown values never become browser observations by themselves.",
+    "The visual-target builder and validator are source_prediction only: explicit/declared/inferred/unknown values never become browser observations by themselves.",
     "The accountless Free/Core path is complete without Elementor Pro.",
     "Elementor Pro remains an optional pre-existing secret/license path; this hardening does not add or require a new account, API key or MCP server.",
     "Controlled runtime evidence does not prove a client staging or production target.",
