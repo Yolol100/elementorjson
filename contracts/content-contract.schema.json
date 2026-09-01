@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://webactueel.local/elementor/content-contract.schema.json",
+  "title": "Elementor project content contract",
+  "type": "object",
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "must_include": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "must_not_include": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "claim_once": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "preferred_ctas": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "required_audiences": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "proof_policy": {
+      "type": "object",
+      "properties": {
+        "unverified_quotes": {"enum": ["block", "warn", "allow_placeholder"]},
+        "unapproved_logos": {"enum": ["block", "warn", "allow_placeholder"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}
