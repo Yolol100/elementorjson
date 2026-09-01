@@ -8,8 +8,11 @@ vt = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(vt)
 
 
-def classic_section(sid='s1', settings=None, elements=None):
-    return {'id': sid, 'elType': 'container', 'isInner': False, 'settings': settings or {}, 'elements': elements or []}
+def classic_section(sid='s1', settings=None, elements=None, styles=None):
+    return {
+        'id': sid, 'elType': 'container', 'isInner': False,
+        'settings': settings or {}, 'elements': elements or [], 'styles': styles or []
+    }
 
 
 def widget(wid, wtype, settings=None):
@@ -17,13 +20,17 @@ def widget(wid, wtype, settings=None):
 
 
 class VisualTargetTests(unittest.TestCase):
-    def build(self, content, intent=None):
-        return vt.build_visual_target({'title': 'T', 'type': 'page', 'version': '0.4', 'content': content}, intent)
+    def build(self, content, intent=None, page_settings=None):
+        return vt.build_visual_target({
+            'title': 'T', 'type': 'page', 'version': '0.4',
+            'page_settings': page_settings or [], 'content': content
+        }, intent)
 
     def test_empty_page_warns_without_inventing_sections(self):
         r = self.build([])
         self.assertEqual(r['sections'], [])
         self.assertFalse(r['summary']['prediction_complete'])
+        self.assertEqual(r['status'], 'warn')
 
     def test_basic_heading_button_is_hero_like_only_as_inference(self):
         r = self.build([classic_section(elements=[widget('h','heading',{'title':'Hello'}), widget('b','button',{'text':'Go'})])])
@@ -54,6 +61,13 @@ class VisualTargetTests(unittest.TestCase):
         self.assertEqual(resp['mobile']['layout']['direction']['value'], 'column-reverse')
         self.assertTrue(resp['mobile']['has_explicit_overrides'])
 
+    def test_custom_classic_breakpoint_is_preserved_without_guessing_target_width(self):
+        r = self.build([classic_section(settings={'flex_direction':'row','flex_direction_laptop':'column'})])
+        custom = r['sections'][0]['custom_responsive_controls']
+        self.assertEqual(custom[0]['breakpoint_suffix'], 'laptop')
+        self.assertEqual(custom[0]['value'], 'column')
+        self.assertEqual(custom[0]['provenance'], 'explicit')
+
     def test_grid_is_explicit(self):
         r = self.build([classic_section(settings={'display':'grid','grid_columns':3,'gap':{'unit':'rem','size':2}})])
         d = r['sections'][0]['responsive']['desktop']['layout']
@@ -74,9 +88,14 @@ class VisualTargetTests(unittest.TestCase):
         r = self.build([classic_section(elements=[widget('h','heading',{'title':'{{post_title}}','dynamic_tags':{'title':'x'}})])])
         self.assertIn('dynamic-content-runtime-value', r['sections'][0]['unknowns'])
 
+    def test_globals_are_detected_as_runtime_references(self):
+        r = self.build([classic_section(elements=[widget('h','heading',{'title':'Hello','__globals__':{'title_color':'globals/colors?id=1'}})])])
+        self.assertIn('__globals__', r['sections'][0]['content']['external_reference_keys'])
+        self.assertIn('global-or-design-system-runtime-reference', r['sections'][0]['unknowns'])
+
     def test_atomic_html_v3_text_is_unwrapped(self):
         atomic = {
-            'id':'a1','elType':'e-div-block','isInner':False,'settings':{},'elements':[{
+            'id':'a1','elType':'e-div-block','isInner':False,'settings':{},'styles':[],'elements':[{
                 'id':'a2','elType':'widget','widgetType':'e-heading','isInner':False,
                 'settings':{'title':{'$$type':'html-v3','value':{'content':{'$$type':'string','value':'Atomic title'},'children':[]}}},
                 'elements':[]
@@ -85,7 +104,7 @@ class VisualTargetTests(unittest.TestCase):
         r = self.build([atomic])
         self.assertIn('Atomic title', r['sections'][0]['content']['text_snippets'])
 
-    def test_atomic_style_variants_are_preserved_as_explicit_source(self):
+    def test_atomic_style_variants_preserve_typed_prop_identity(self):
         atomic = {
             'id':'a1','elType':'e-flexbox','isInner':False,'settings':{},
             'styles':[{'id':'style1','type':'local','variants':[
@@ -103,9 +122,35 @@ class VisualTargetTests(unittest.TestCase):
         rules = r['sections'][0]['atomic_style_rules']
         self.assertEqual(len(rules), 2)
         self.assertEqual(rules[0]['properties']['display']['value'], 'flex')
-        self.assertEqual(rules[0]['properties']['gap']['provenance'], 'explicit')
+        self.assertEqual(rules[0]['properties']['display']['typed_type'], 'string')
+        self.assertEqual(rules[0]['properties']['gap']['value'], '24px')
+        self.assertEqual(rules[0]['properties']['gap']['typed_type'], 'size')
         self.assertEqual(rules[1]['breakpoint'], 'mobile')
         self.assertEqual(rules[1]['properties']['flex-direction']['value'], 'column')
+        self.assertNotIn('desktop.layout.gap', r['sections'][0]['unknowns'])
+
+    def test_atomic_style_object_container_is_preserved(self):
+        atomic = {
+            'id':'a1','elType':'e-flexbox','isInner':False,'settings':{},
+            'styles':{
+                'local-style':{
+                    'type':'local',
+                    'variants':{
+                        'mobile-normal':{
+                            'meta':{'breakpoint':'mobile','state':'normal'},
+                            'props':{'flex-direction':{'$$type':'string','value':'column'}}
+                        }
+                    }
+                }
+            },
+            'elements':[]
+        }
+        r = self.build([atomic])
+        rules = r['sections'][0]['atomic_style_rules']
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0]['style_id'], 'local-style')
+        self.assertEqual(rules[0]['breakpoint'], 'mobile')
+        self.assertEqual(rules[0]['properties']['flex-direction']['typed_type'], 'string')
 
     def test_design_intent_is_declared_not_explicit(self):
         intent = {'schema_version':'1.0','sections':[{'section_id':'s1','section_role':'hero','selected_pattern':'split','alignment':'left','responsive_plan':{'desktop':'split','tablet':'split','mobile':'stack'}}]}
@@ -119,6 +164,10 @@ class VisualTargetTests(unittest.TestCase):
         self.assertEqual(r['sections'][1]['adjacency']['previous_section_id'], 'a')
         self.assertEqual(r['sections'][1]['adjacency']['next_section_id'], 'c')
         self.assertEqual(r['whole_page']['section_order'], ['a','b','c'])
+
+    def test_page_settings_are_part_of_whole_page_model(self):
+        r = self.build([classic_section()], page_settings={'hide_title':'yes'})
+        self.assertEqual(r['whole_page']['page_settings']['hide_title'], 'yes')
 
     def test_duplicate_top_ids_warn(self):
         r = self.build([classic_section('dup'), classic_section('dup')])
