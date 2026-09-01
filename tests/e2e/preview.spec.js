@@ -18,9 +18,7 @@ function buildViewports() {
     const breakpoints = inventory?.environment?.active_breakpoints || {};
     for (const [name, breakpoint] of Object.entries(breakpoints)) {
       const value = Number(breakpoint?.value);
-      if (!Number.isFinite(value) || value < 240 || value > 3840) {
-        continue;
-      }
+      if (!Number.isFinite(value) || value < 240 || value > 3840) continue;
       candidates.push({ name: `breakpoint-${name}-at`, width: value, height: Math.max(844, Math.round(value * 1.2)) });
       if (value + 1 <= 3840) {
         candidates.push({ name: `breakpoint-${name}-above`, width: value + 1, height: Math.max(844, Math.round((value + 1) * 1.2)) });
@@ -43,6 +41,85 @@ function slugify(filename) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+async function captureLayoutSnapshot(page) {
+  return page.evaluate(() => {
+    const round = (value) => Math.round(value * 100) / 100;
+    const css = (style, prop) => style.getPropertyValue(prop) || null;
+    const candidates = Array.from(document.querySelectorAll('[data-id], .elementor-element'));
+    const seen = new Set();
+    const elements = [];
+
+    for (const element of candidates) {
+      if (!(element instanceof HTMLElement)) continue;
+      const dataId = element.getAttribute('data-id');
+      const classId = Array.from(element.classList).find((name) => name.startsWith('elementor-element-'));
+      const key = dataId || classId || null;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const parentRect = element.parentElement?.getBoundingClientRect();
+      elements.push({
+        key,
+        data_id: dataId,
+        element_type: element.getAttribute('data-element_type') || element.getAttribute('data-elementor-type') || null,
+        tag: element.tagName.toLowerCase(),
+        text_sample: (element.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 140),
+        rect: {
+          x: round(rect.x), y: round(rect.y), width: round(rect.width), height: round(rect.height),
+          right: round(rect.right), bottom: round(rect.bottom)
+        },
+        parent_width: parentRect ? round(parentRect.width) : null,
+        width_ratio_to_parent: parentRect && parentRect.width > 0 ? round(rect.width / parentRect.width) : null,
+        computed: {
+          display: style.display,
+          position: style.position,
+          flex_direction: style.flexDirection,
+          flex_wrap: style.flexWrap,
+          justify_content: style.justifyContent,
+          align_items: style.alignItems,
+          grid_template_columns: style.gridTemplateColumns,
+          gap: style.gap,
+          row_gap: style.rowGap,
+          column_gap: style.columnGap,
+          padding: `${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
+          margin: `${style.marginTop} ${style.marginRight} ${style.marginBottom} ${style.marginLeft}`,
+          overflow_x: style.overflowX,
+          overflow_y: style.overflowY,
+          text_align: style.textAlign,
+          font_size: style.fontSize,
+          line_height: style.lineHeight,
+          background_color: style.backgroundColor,
+          border_radius: style.borderRadius,
+          visibility: style.visibility,
+          opacity: style.opacity,
+          transform: style.transform,
+          inline_size: css(style, 'inline-size'),
+          block_size: css(style, 'block-size')
+        },
+        child_element_count: element.querySelectorAll(':scope > [data-id], :scope > .elementor-element').length
+      });
+      if (elements.length >= 300) break;
+    }
+
+    const pageRect = document.documentElement.getBoundingClientRect();
+    return {
+      schema_version: '1.0',
+      viewport: { width: window.innerWidth, height: window.innerHeight, device_pixel_ratio: window.devicePixelRatio },
+      document: {
+        scroll_width: document.documentElement.scrollWidth,
+        scroll_height: document.documentElement.scrollHeight,
+        client_width: document.documentElement.clientWidth,
+        client_height: document.documentElement.clientHeight,
+        rect_width: round(pageRect.width)
+      },
+      element_count: elements.length,
+      elements
+    };
+  });
 }
 
 const templates = fs.existsSync(templateDir)
@@ -114,6 +191,9 @@ for (const template of templates) {
         expect(activeTag, 'Expected keyboard focus to move away from BODY').not.toBe('BODY');
       }
 
+      const layoutSnapshot = await captureLayoutSnapshot(page);
+      expect(layoutSnapshot.document.scroll_width).toBeLessThanOrEqual(layoutSnapshot.document.client_width + 1);
+
       fs.mkdirSync(screenshotDir, { recursive: true });
       const projectName = testInfo.project.name;
       const basename = `${slug}-${projectName}-${viewport.name}`;
@@ -139,7 +219,8 @@ for (const template of templates) {
           failed_requests: failedRequests,
           bad_responses: badResponses,
           horizontal_overflow: overflow,
-          broken_images: brokenImages
+          broken_images: brokenImages,
+          layout_snapshot: layoutSnapshot
         }, null, 2) + '\n'
       );
 
