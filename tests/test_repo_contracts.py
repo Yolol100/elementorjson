@@ -47,12 +47,19 @@ class RepositoryContractTests(unittest.TestCase):
 
     def test_toolkit_rejects_loss_of_mandatory_runtime_tools_and_assertions(self):
         toolkit = json.loads((ROOT / "toolkit-contract.json").read_text(encoding="utf-8"))
-        for missing_tool in ["visual-target-builder", "page-composition-auditor", "npm-audit", "hello-elementor"]:
+        for missing_tool in ["visual-target-builder", "visual-target-validator", "page-composition-auditor", "npm-audit", "hello-elementor"]:
             mutated = copy.deepcopy(toolkit)
             mutated["tools"] = [item for item in mutated["tools"] if item.get("id") != missing_tool]
             mutated["usage_assertions"] = [item for item in mutated["usage_assertions"] if item.get("tool") != missing_tool]
-            errors = validate_toolkit(mutated)
+            errors = validate_toolkit(mutated, ROOT)
             self.assertTrue(any(missing_tool in error for error in errors), (missing_tool, errors))
+
+    def test_toolkit_usage_assertions_are_checked_against_repo_files(self):
+        toolkit = json.loads((ROOT / "toolkit-contract.json").read_text(encoding="utf-8"))
+        mutated = copy.deepcopy(toolkit)
+        mutated["usage_assertions"][0]["contains"] = "__definitely_missing_wiring_marker__"
+        errors = validate_toolkit(mutated, ROOT)
+        self.assertTrue(any("usage assertion mismatch" in error for error in errors), errors)
 
     def test_visual_target_schema_keeps_prediction_boundary(self):
         self.assertEqual(validate_visual_target_schema(ROOT), [])
@@ -69,7 +76,7 @@ class RepositoryContractTests(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "composition-contract.yml").read_text(encoding="utf-8")
         for marker in [
             "contracts/**", "sidecars/**", "templates/**", "audit_page_composition.py", "build_visual_target.py",
-            ".design-intent.json", ".content-contract.json", "visual-targets",
+            "validate_visual_target.py", ".design-intent.json", ".content-contract.json", "visual-targets",
         ]:
             self.assertIn(marker, workflow)
 
