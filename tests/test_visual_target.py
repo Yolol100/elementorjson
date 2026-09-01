@@ -85,6 +85,28 @@ class VisualTargetTests(unittest.TestCase):
         r = self.build([atomic])
         self.assertIn('Atomic title', r['sections'][0]['content']['text_snippets'])
 
+    def test_atomic_style_variants_are_preserved_as_explicit_source(self):
+        atomic = {
+            'id':'a1','elType':'e-flexbox','isInner':False,'settings':{},
+            'styles':[{'id':'style1','type':'local','variants':[
+                {'meta':{'breakpoint':'desktop','state':'normal'},'props':{
+                    'display':{'$$type':'string','value':'flex'},
+                    'gap':{'$$type':'size','value':{'size':24,'unit':'px'}}
+                }},
+                {'meta':{'breakpoint':'mobile','state':'normal'},'props':{
+                    'flex-direction':{'$$type':'string','value':'column'}
+                }}
+            ]}],
+            'elements':[]
+        }
+        r = self.build([atomic])
+        rules = r['sections'][0]['atomic_style_rules']
+        self.assertEqual(len(rules), 2)
+        self.assertEqual(rules[0]['properties']['display']['value'], 'flex')
+        self.assertEqual(rules[0]['properties']['gap']['provenance'], 'explicit')
+        self.assertEqual(rules[1]['breakpoint'], 'mobile')
+        self.assertEqual(rules[1]['properties']['flex-direction']['value'], 'column')
+
     def test_design_intent_is_declared_not_explicit(self):
         intent = {'schema_version':'1.0','sections':[{'section_id':'s1','section_role':'hero','selected_pattern':'split','alignment':'left','responsive_plan':{'desktop':'split','tablet':'split','mobile':'stack'}}]}
         r = self.build([classic_section('s1')], intent)
