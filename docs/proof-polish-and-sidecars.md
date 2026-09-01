@@ -1,54 +1,58 @@
 # Proof, visual polish and sidecar contracts
 
-`elementorjson` does not choose art direction. Upstream Project Elementor + the `elementor` skill may supply two optional sidecars so this repository can lint declared design/content intent without hard-coding one client's rules.
+`elementorjson` does not choose art direction. Project Elementor + the `elementor` Skill may supply optional sidecars so this repository can lint declared intent without hard-coding client rules. The repository can also derive a deterministic whole-page Visual Target from the Elementor source.
 
 ## Files
 
-- `contracts/design-intent.schema.json` — section roles/patterns, responsive transformation, proof metadata, baseline/version intent, density/component model, layout contract and unit strategy.
-- `contracts/content-contract.schema.json` — global constraints plus optional `required_sections`, section-level required/forbidden content, CTA rules, H1 count and proof policy.
-- `tools/audit_page_composition.py` — source-level lint for those contracts plus unit profiling and generic layout-risk heuristics.
-- `.github/workflows/composition-contract.yml` — dedicated source-level CI for contract/schema changes and every committed template.
+- `contracts/design-intent.schema.json` — optional section roles/patterns, responsive transformation, proof metadata, baseline/version intent, density/component model, layout contract and unit strategy.
+- `contracts/content-contract.schema.json` — optional global/section content constraints and proof policy.
+- `contracts/visual-target.schema.json` — generated whole-page prediction contract and evidence boundary.
+- `tools/audit_page_composition.py` — source-level composition/layout-risk lint.
+- `tools/build_visual_target.py` — deterministic JSON → whole-page Visual Target builder.
+- `.github/workflows/composition-contract.yml` — source-level CI for composition, contracts and Visual Targets.
 
-```bash
-python tools/audit_page_composition.py page.json \
-  --design-intent page.design-intent.json \
-  --content-contract page.content-contract.json \
-  --json-output composition-report.json
-```
+## Visual Target contract
 
-## Repository sidecar convention
+For each `templates/<stem>.json`, CI creates `artifacts/visual-targets/<stem>.json`. When `sidecars/<stem>.design-intent.json` exists, declared design intent is attached without converting it into observed fact.
 
-Runtime templates stay in `templates/`. Optional sidecars stay in `sidecars/` so the Elementor runtime workflow never mistakes a design/content contract for an importable Elementor template.
+The builder must preserve provenance:
 
-For `templates/homepage.json`, CI automatically looks for:
+- `explicit`: directly encoded in Elementor JSON;
+- `declared`: supplied by a design-intent contract;
+- `inferred`: bounded structural interpretation;
+- `unknown`: unresolved by source evidence.
 
-- `sidecars/homepage.design-intent.json`
-- `sidecars/homepage.content-contract.json`
+It assembles the whole page first: document role/type, section count/order, adjacency, widgets, dynamic markers and per-section desktop/tablet/mobile layout/style fields. It may infer only broad low/medium-confidence role hints such as hero-like or CTA-like. It must never invent exact spacing, geometry, typography, media output or runtime values that are absent from source.
 
-The dedicated `Page Composition Contract` workflow is triggered by `contracts/**`, `sidecars/**`, `templates/**` and the composition tooling/tests. It validates repository wiring, runs regressions, then runs `audit_page_composition.py` for every template and attaches any matching sidecars. Contract-only changes therefore receive source-level composition QA without forcing an unrelated WordPress/browser runtime run.
+`evidence_class=source_prediction` and `render_observed=false` are immutable boundaries. A green Visual Target means the prediction contract was built consistently; it does not mean the prediction matches a real browser.
 
-## Briefing and baseline fields
+## Sidecar convention
 
-A design-intent sidecar may declare `baseline_ref`/`baseline_version` and, per section, `density`, `component_model`, `cta_tier`, `equal_height_strategy` and a `layout_contract`. A content contract may declare `required_sections`, `required_h1_count`, `cta_once` and `section_rules`.
+Runtime templates stay in `templates/`. Optional authored project contracts stay in `sidecars/`:
 
-Section rules remain project data. They can say a hero requires a specific claim or CTA, but this repository must never hard-code one client's wording into generic logic.
+- `sidecars/<stem>.design-intent.json`
+- `sidecars/<stem>.content-contract.json`
 
-When a section rule supplies a `section_id`, the composition linter can bind it to a top-level Elementor element with the same ID and check required/forbidden text in that region. A role-only rule is bound only when the design intent resolves it to exactly one section. Ambiguous/unbound rules warn rather than pretending section placement was proven.
+Generated Visual Targets belong only in workflow artifacts, not as hand-maintained source truth on the default branch.
 
-## Generic layout warnings
+## Closed-loop visual polish
 
-The linter also reports generic source risks that repeatedly cause broken marketing pages:
+After an actual controlled-runtime, staging or target render is available, compare the Visual Target with both screenshot and machine-readable DOM layout data. Use screenshot evidence for visual hierarchy/crop/rhythm and `layout_snapshot` for observable geometry such as bounding boxes, parent width ratio, flex/grid direction, wrap, gaps, padding, margins, overflow, text alignment and computed sizes.
 
-- `flex_width_gap_overcommit` — explicit percentage child widths already consume ~100% while the parent also declares a non-zero gap;
-- `artificial_stretch_whitespace` — a height-constrained sparse container uses centered/distributed justification and should be inspected before filler content is added;
-- `semantic_h1_count` — optional contract-driven H1 count mismatch;
-- `repeated_primary_cta` — a label marked in `cta_once` appears repeatedly;
-- `required_claim_wrong_section` / `missing_section_cta` — a bound section violates its project-specific section rule.
+A mismatch must be classified before repair. Change only the smallest confirmed cause, rerun the affected checks and rebuild the whole-page Visual Target after a material JSON change. Previously passed sections remain frozen unless the new change can affect them.
 
-These are source-level signals, not visual verdicts. A complex target can intentionally need a different structure; repair only confirmed defects and preserve proven target behavior.
+## Generic source warnings
+
+The composition linter continues to report source risks such as:
+
+- `flex_width_gap_overcommit`;
+- `artificial_stretch_whitespace`;
+- `semantic_h1_count`;
+- `repeated_primary_cta`;
+- `required_claim_wrong_section` / `missing_section_cta`.
+
+These are source-level signals, not visual verdicts. Target preservation wins over mechanical cleanup when a real target proves intentional behavior.
 
 ## Boundaries
 
-A green source report is not visual proof. Screenshot/browser review remains required for spacing, hierarchy, media crop, wrapping, empty space and aesthetics. Proof sidecars report provenance status; they never create testimonial text, customer permission or conversion evidence.
-
-Relative-first unit lint is advisory because clean target exports may intentionally use PX and Elementor documents cases where fixed breakpoint gaps can be useful. Target preservation wins over mechanical unit conversion.
+A Visual Target is not a screenshot. A DOM layout snapshot is not an aesthetic verdict. A controlled-runtime render is not customer staging. Screenshot/browser review remains required for claims about visible alignment, hierarchy, media crop, wrapping, empty space or aesthetics; Website QA remains required for target/release acceptance where applicable.
