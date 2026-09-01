@@ -20,3 +20,9 @@ Recommended inspiration discovery sources are SaaSFrame, Lapa Ninja and Land-boo
 A page-level handoff should be able to state, at minimum, the chosen pattern for each major section and why adjacent sections form one coherent visual system. The controlled-runtime QA in this repository can validate JSON structure, dependencies, importer behavior, responsive rendering and browser failures, but it does not prove subjective design quality or automatically detect that two different sections are aesthetically too similar.
 
 When a visual baseline exists, staging/browser comparison remains the appropriate proof route after controlled-runtime checks.
+
+## Proof, units and machine-readable intent
+
+For substantial pages the upstream workflow may provide `*.design-intent.json` and `*.content-contract.json` sidecars using the schemas under `contracts/`. `tools/audit_page_composition.py` can then lint declared section repetition, client-specific required/forbidden content, proof provenance status and unit usage without choosing art direction itself.
+
+Direct testimonials are distinct from factual customer stories, third-party ratings and logo permissions. An unverified relationship must never be converted into a quote. Relative-first unit guidance is advisory: clean target units and tested breakpoint-specific PX exceptions are preserved when appropriate. See `docs/proof-polish-and-sidecars.md`.
