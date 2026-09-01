@@ -29,11 +29,14 @@
     {"tool":"visual-target-validator","path":".github/workflows/composition-contract.yml","contains":"validate_visual_target.py"},
     {"tool":"npm-audit","path":".github/workflows/validate.yml","contains":"npm audit --audit-level=high"},
     {"tool":"wp-env","path":"package.json","contains":"\"@wordpress/env\": \"11.11.0\""},
+    {"tool":"wp-env","path":".wp-env.json","contains":"WordPress/WordPress#7.1"},
+    {"tool":"wp-env","path":".wp-env.json","contains":"\"phpVersion\": \"8.3\""},
     {"tool":"elementor-core","path":".github/workflows/validate.yml","contains":"ELEMENTOR_CORE_VERSION: '4.2.4'"},
     {"tool":"hello-elementor","path":".github/workflows/validate.yml","contains":"HELLO_ELEMENTOR_VERSION: '3.5.1'"},
     {"tool":"template-library-import","path":".github/workflows/validate.yml","contains":"elementor library import"},
     {"tool":"semantic-roundtrip","path":".github/workflows/validate.yml","contains":"compare_elementor_roundtrip.py"},
-    {"tool":"playwright","path":"package.json","contains":"\"@playwright/test\": \"1.61.1\""}
+    {"tool":"playwright","path":"package.json","contains":"\"@playwright/test\": \"1.61.1\""},
+    {"tool":"playwright","path":"tests/e2e/preview.spec.js","contains":"layout_snapshot"}
   ],
   "boundaries": [
     "The visual-target builder and validator are source_prediction only: explicit/declared/inferred/unknown values never become browser observations by themselves.",
