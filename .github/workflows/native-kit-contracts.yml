@@ -1,0 +1,156 @@
+name: Native Elementor Contract Fixtures
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/native-kit-contracts.yml'
+      - '.wp-env.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tools/validate_native_kit_contracts.py'
+      - 'tests/test_native_kit_contracts.py'
+      - 'wordpress-plugin/elementor-json-lab/includes/class-native-contract-fixtures.php'
+      - 'wordpress-plugin/elementor-json-lab/runtime/native-contract.php'
+      - 'runtime-contract.json'
+      - 'toolkit-contract.json'
+      - 'docs/native-design-kit-contract-fixtures.md'
+      - 'README.md'
+  pull_request:
+    paths:
+      - '.github/workflows/native-kit-contracts.yml'
+      - '.wp-env.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tools/validate_native_kit_contracts.py'
+      - 'tests/test_native_kit_contracts.py'
+      - 'wordpress-plugin/elementor-json-lab/includes/class-native-contract-fixtures.php'
+      - 'wordpress-plugin/elementor-json-lab/runtime/native-contract.php'
+      - 'runtime-contract.json'
+      - 'toolkit-contract.json'
+      - 'docs/native-design-kit-contract-fixtures.md'
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ELEMENTOR_CORE_VERSION: '4.2.4'
+  HELLO_ELEMENTOR_VERSION: '3.5.1'
+  EXPECTED_WORDPRESS_VERSION: '7.1'
+  EXPECTED_PHP_SERIES: '8.3'
+
+jobs:
+  native-contracts:
+    name: Native kit export import and media contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Run native contract unit tests
+        run: python -m unittest -v tests/test_native_kit_contracts.py
+
+      - name: Install locked runtime tooling
+        run: npm ci --no-fund
+
+      - name: Start WordPress runtime
+        run: npx wp-env start
+
+      - name: Install pinned Elementor runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION" --activate
+          npx wp-env run cli wp plugin activate elementor-json-lab
+          npx wp-env run cli wp theme install hello-elementor -- --version="$HELLO_ELEMENTOR_VERSION" --activate
+          npx wp-env run cli wp rewrite structure '/%postname%/'
+          npx wp-env run cli wp rewrite flush --hard
+
+      - name: Verify pinned versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          wp_version="$(npx wp-env run cli wp core version | tail -n 1 | tr -d '\r')"
+          elementor_version="$(npx wp-env run cli wp plugin get elementor --field=version | tail -n 1 | tr -d '\r')"
+          php_version="$(npx wp-env run cli wp eval 'echo PHP_VERSION;' | tail -n 1 | tr -d '\r')"
+          test "$wp_version" = "$EXPECTED_WORDPRESS_VERSION"
+          test "$elementor_version" = "$ELEMENTOR_CORE_VERSION"
+          [[ "$php_version" == "$EXPECTED_PHP_SERIES".* ]]
+
+      - name: Generate native V3 V4 and mixed Website Template contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime='/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contracts'
+          script='/var/www/html/wp-content/plugins/elementor-json-lab/runtime/native-contract.php'
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/native-contracts
+
+          for profile in v3 v4 mixed; do
+            npx wp-env run cli wp --user=admin eval-file "$script" seed "$profile" "$runtime/expected-$profile.json"
+            npx wp-env run cli wp --user=admin eval-file "$script" export "$profile" "$runtime/$profile.zip"
+          done
+
+      - name: Native kit import roundtrip
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime='/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contracts'
+          script='/var/www/html/wp-content/plugins/elementor-json-lab/runtime/native-contract.php'
+
+          for profile in v3 v4 mixed; do
+            npx wp-env run cli wp --user=admin eval-file "$script" reset
+            npx wp-env run cli wp --user=admin elementor kit import "$runtime/$profile.zip" --include=site-settings --unfilteredFilesUpload=disable
+            npx wp-env run cli wp --user=admin eval-file "$script" snapshot ignored "$runtime/roundtrip-$profile.json"
+          done
+
+      - name: Generate and observe native media controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime='/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contracts'
+          script='/var/www/html/wp-content/plugins/elementor-json-lab/runtime/native-contract.php'
+          source_dir="$runtime/media-source"
+          observed_dir="$runtime/media-observed"
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/native-contracts/media-observed
+
+          npx wp-env run cli wp --user=admin eval-file "$script" media ignored "$source_dir"
+
+          for filename in image-control.json background-control.json gallery-control.json; do
+            source="$source_dir/$filename"
+            observed="$observed_dir/$filename"
+            npx wp-env run cli wp --user=admin elementor library import "$source" --returnType=ids
+            npx wp-env run cli wp --user=admin ejl export_library --source-template="$source" --output="$observed"
+          done
+
+      - name: Validate native contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/native-kit-contracts
+          cp -R wordpress-plugin/elementor-json-lab/.runtime/native-contracts/. artifacts/native-kit-contracts/
+          python tools/validate_native_kit_contracts.py artifacts/native-kit-contracts --report artifacts/native-kit-contracts/validation-report.json
+
+      - name: Upload native Elementor contract artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-elementor-contracts
+          path: artifacts/native-kit-contracts
+          if-no-files-found: error
+
+      - name: Stop WordPress environment
+        if: always()
+        run: npx wp-env stop || true
