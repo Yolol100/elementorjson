@@ -15,7 +15,7 @@ final class Widget_Inventory {
 		$atomic = Atomic_Capabilities::collect( $elementor, $warnings );
 
 		return array(
-			'schema_version'      => '1.2',
+			'schema_version'      => '1.1',
 			'generated_at'        => gmdate( 'c' ),
 			'environment'         => array(
 				'wordpress'          => get_bloginfo( 'version' ),
