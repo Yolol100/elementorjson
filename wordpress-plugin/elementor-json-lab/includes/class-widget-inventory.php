@@ -11,11 +11,13 @@ final class Widget_Inventory {
 		}
 
 		$elementor = \Elementor\Plugin::instance();
+		$warnings = array();
+		$atomic = Atomic_Capabilities::collect( $elementor, $warnings );
 
 		return array(
-			'schema_version' => '1.1',
-			'generated_at'   => gmdate( 'c' ),
-			'environment'    => array(
+			'schema_version'      => '1.2',
+			'generated_at'        => gmdate( 'c' ),
+			'environment'         => array(
 				'wordpress'          => get_bloginfo( 'version' ),
 				'php'                => PHP_VERSION,
 				'elementor'          => defined( 'ELEMENTOR_VERSION' ) ? ELEMENTOR_VERSION : null,
@@ -26,88 +28,124 @@ final class Widget_Inventory {
 				'active_devices'     => self::active_devices( $elementor ),
 				'active_breakpoints' => self::active_breakpoints( $elementor ),
 			),
-			'widgets'        => self::collect_widgets( $elementor ),
-			'elements'       => self::collect_elements( $elementor ),
-			'document_types' => self::collect_document_types( $elementor ),
-			'dynamic_tags'   => self::collect_dynamic_tags( $elementor ),
+			'widgets'             => self::collect_widgets( $elementor, $warnings ),
+			'elements'            => self::collect_elements( $elementor, $warnings ),
+			'document_types'      => self::collect_document_types( $elementor, $warnings ),
+			'dynamic_tags'        => self::collect_dynamic_tags( $elementor, $warnings ),
+			'experiments'         => $atomic['experiments'],
+			'atomic_style_schema' => $atomic['atomic_style_schema'],
+			'atomic_dynamic_tags' => $atomic['atomic_dynamic_tags'],
+			'global_classes'      => $atomic['global_classes'],
+			'variables'           => $atomic['variables'],
+			'components'          => $atomic['components'],
+			'interactions'        => $atomic['interactions'],
+			'warnings'            => array_values( array_unique( $warnings ) ),
 		);
 	}
 
-	private static function collect_widgets( object $elementor ): array {
+	private static function collect_widgets( object $elementor, array &$warnings ): array {
 		if ( ! isset( $elementor->widgets_manager ) || ! method_exists( $elementor->widgets_manager, 'get_widget_types' ) ) {
 			return array();
 		}
 
+		try {
+			$widgets = (array) $elementor->widgets_manager->get_widget_types();
+		} catch ( \Throwable $exception ) {
+			$warnings[] = 'widgets_inventory_failed';
+			return array();
+		}
+
 		$result = array();
-		foreach ( (array) $elementor->widgets_manager->get_widget_types() as $name => $widget ) {
+		foreach ( $widgets as $name => $widget ) {
 			if ( ! is_object( $widget ) ) {
 				continue;
 			}
-			$result[ (string) $name ] = self::component_record( $widget, (string) $name );
+			try {
+				$result[ (string) $name ] = self::component_record( $widget, (string) $name, $warnings );
+			} catch ( \Throwable $exception ) {
+				$warnings[] = 'widget_skipped:' . sanitize_key( (string) $name );
+			}
 		}
 		ksort( $result );
 		return $result;
 	}
 
-	private static function collect_elements( object $elementor ): array {
+	private static function collect_elements( object $elementor, array &$warnings ): array {
 		if ( ! isset( $elementor->elements_manager ) || ! method_exists( $elementor->elements_manager, 'get_element_types' ) ) {
 			return array();
 		}
 
+		try {
+			$elements = (array) $elementor->elements_manager->get_element_types();
+		} catch ( \Throwable $exception ) {
+			$warnings[] = 'elements_inventory_failed';
+			return array();
+		}
+
 		$result = array();
-		foreach ( (array) $elementor->elements_manager->get_element_types() as $name => $element ) {
+		foreach ( $elements as $name => $element ) {
 			if ( ! is_object( $element ) ) {
 				continue;
 			}
-			$record = self::component_record( $element, (string) $name );
-			$atomic_utils = '\\Elementor\\Modules\\AtomicWidgets\\Utils\\Utils';
-			$record['atomic'] = class_exists( $atomic_utils ) && method_exists( $atomic_utils, 'is_atomic' )
-				? (bool) $atomic_utils::is_atomic( $element )
-				: null;
-			$result[ (string) $name ] = $record;
+			try {
+				$result[ (string) $name ] = self::component_record( $element, (string) $name, $warnings );
+			} catch ( \Throwable $exception ) {
+				$warnings[] = 'element_skipped:' . sanitize_key( (string) $name );
+			}
 		}
 		ksort( $result );
 		return $result;
 	}
 
-	private static function collect_document_types( object $elementor ): array {
+	private static function collect_document_types( object $elementor, array &$warnings ): array {
 		if ( ! isset( $elementor->documents ) || ! method_exists( $elementor->documents, 'get_document_types' ) ) {
 			return array();
 		}
 
+		try {
+			$types = (array) $elementor->documents->get_document_types();
+		} catch ( \Throwable $exception ) {
+			$warnings[] = 'document_types_inventory_failed';
+			return array();
+		}
+
 		$result = array();
-		foreach ( (array) $elementor->documents->get_document_types() as $type => $class_name ) {
+		foreach ( $types as $type => $class_name ) {
 			if ( ! is_string( $class_name ) || ! class_exists( $class_name ) ) {
 				continue;
 			}
-
-			$properties = method_exists( $class_name, 'get_properties' ) ? (array) $class_name::get_properties() : array();
-			$result[ (string) $type ] = array(
-				'class'           => $class_name,
-				'title'           => method_exists( $class_name, 'get_title' ) ? wp_strip_all_tags( (string) $class_name::get_title() ) : (string) $type,
-				'plural_title'    => method_exists( $class_name, 'get_plural_title' ) ? wp_strip_all_tags( (string) $class_name::get_plural_title() ) : null,
-				'cpt'             => isset( $properties['cpt'] ) ? array_values( array_map( 'strval', (array) $properties['cpt'] ) ) : array(),
-				'show_in_library' => isset( $properties['show_in_library'] ) ? (bool) $properties['show_in_library'] : null,
-				'register_type'   => isset( $properties['register_type'] ) ? (bool) $properties['register_type'] : null,
-				'is_editable'     => isset( $properties['is_editable'] ) ? (bool) $properties['is_editable'] : null,
-			);
+			try {
+				$properties = method_exists( $class_name, 'get_properties' ) ? (array) $class_name::get_properties() : array();
+				$result[ (string) $type ] = array(
+					'class'           => $class_name,
+					'title'           => method_exists( $class_name, 'get_title' ) ? wp_strip_all_tags( (string) $class_name::get_title() ) : (string) $type,
+					'plural_title'    => method_exists( $class_name, 'get_plural_title' ) ? wp_strip_all_tags( (string) $class_name::get_plural_title() ) : null,
+					'cpt'             => isset( $properties['cpt'] ) ? array_values( array_map( 'strval', (array) $properties['cpt'] ) ) : array(),
+					'show_in_library' => isset( $properties['show_in_library'] ) ? (bool) $properties['show_in_library'] : null,
+					'register_type'   => isset( $properties['register_type'] ) ? (bool) $properties['register_type'] : null,
+					'is_editable'     => isset( $properties['is_editable'] ) ? (bool) $properties['is_editable'] : null,
+				);
+			} catch ( \Throwable $exception ) {
+				$warnings[] = 'document_type_skipped:' . sanitize_key( (string) $type );
+			}
 		}
 		ksort( $result );
 		return $result;
 	}
 
-	private static function collect_dynamic_tags( object $elementor ): array {
+	private static function collect_dynamic_tags( object $elementor, array &$warnings ): array {
 		if ( ! isset( $elementor->dynamic_tags ) || ! method_exists( $elementor->dynamic_tags, 'get_tags' ) ) {
 			return array();
 		}
 
-		$result = array();
 		try {
 			$tags = $elementor->dynamic_tags->get_tags();
 		} catch ( \Throwable $exception ) {
+			$warnings[] = 'dynamic_tags_inventory_failed';
 			return array();
 		}
 
+		$result = array();
 		foreach ( (array) $tags as $name => $tag_info ) {
 			$tag = is_array( $tag_info ) && isset( $tag_info['instance'] ) && is_object( $tag_info['instance'] )
 				? $tag_info['instance']
@@ -116,42 +154,54 @@ final class Widget_Inventory {
 				continue;
 			}
 
-			$owner = self::detect_owner( $tag );
-			$result[ (string) $name ] = array(
-				'name'        => method_exists( $tag, 'get_name' ) ? (string) $tag->get_name() : (string) $name,
-				'title'       => method_exists( $tag, 'get_title' ) ? wp_strip_all_tags( (string) $tag->get_title() ) : (string) $name,
-				'class'       => get_class( $tag ),
-				'owner'       => $owner['owner'],
-				'plugin_slug' => $owner['plugin_slug'],
-				'group'       => method_exists( $tag, 'get_group' ) && is_scalar( $tag->get_group() ) ? (string) $tag->get_group() : null,
-				'categories'  => method_exists( $tag, 'get_categories' ) ? array_values( array_map( 'strval', (array) $tag->get_categories() ) ) : array(),
-				'controls'    => self::collect_controls( $tag ),
-			);
+			try {
+				$owner = self::detect_owner( $tag );
+				$result[ (string) $name ] = array(
+					'name'        => method_exists( $tag, 'get_name' ) ? (string) $tag->get_name() : (string) $name,
+					'title'       => method_exists( $tag, 'get_title' ) ? wp_strip_all_tags( (string) $tag->get_title() ) : (string) $name,
+					'class'       => get_class( $tag ),
+					'owner'       => $owner['owner'],
+					'plugin_slug' => $owner['plugin_slug'],
+					'group'       => method_exists( $tag, 'get_group' ) && is_scalar( $tag->get_group() ) ? (string) $tag->get_group() : null,
+					'categories'  => method_exists( $tag, 'get_categories' ) ? array_values( array_map( 'strval', (array) $tag->get_categories() ) ) : array(),
+					'controls'    => self::collect_controls( $tag, $warnings ),
+				);
+			} catch ( \Throwable $exception ) {
+				$warnings[] = 'dynamic_tag_skipped:' . sanitize_key( (string) $name );
+			}
 		}
 		ksort( $result );
 		return $result;
 	}
 
-	private static function component_record( object $component, string $fallback_name ): array {
+	private static function component_record( object $component, string $fallback_name, array &$warnings ): array {
 		$owner = self::detect_owner( $component );
-		return array(
+		$record = array(
 			'name'        => method_exists( $component, 'get_name' ) ? (string) $component->get_name() : $fallback_name,
 			'title'       => method_exists( $component, 'get_title' ) ? wp_strip_all_tags( (string) $component->get_title() ) : $fallback_name,
 			'class'       => get_class( $component ),
 			'owner'       => $owner['owner'],
 			'plugin_slug' => $owner['plugin_slug'],
 			'categories'  => method_exists( $component, 'get_categories' ) ? array_values( array_map( 'strval', (array) $component->get_categories() ) ) : array(),
-			'controls'    => self::collect_controls( $component ),
+			'controls'    => self::collect_controls( $component, $warnings ),
 		);
+		return array_merge( $record, Atomic_Capabilities::describe_component( $component, $warnings ) );
 	}
 
-	private static function collect_controls( object $component ): array {
+	private static function collect_controls( object $component, array &$warnings ): array {
 		if ( ! method_exists( $component, 'get_controls' ) ) {
 			return array();
 		}
 
+		try {
+			$raw_controls = (array) $component->get_controls();
+		} catch ( \Throwable $exception ) {
+			$warnings[] = 'controls_inventory_failed:' . sanitize_key( get_class( $component ) );
+			return array();
+		}
+
 		$controls = array();
-		foreach ( (array) $component->get_controls() as $control_name => $control ) {
+		foreach ( $raw_controls as $control_name => $control ) {
 			if ( ! is_array( $control ) ) {
 				continue;
 			}
@@ -215,6 +265,7 @@ final class Widget_Inventory {
 				'direction' => method_exists( $breakpoint, 'get_direction' ) ? (string) $breakpoint->get_direction() : null,
 			);
 		}
+		ksort( $result );
 		return $result;
 	}
 
