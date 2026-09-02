@@ -6,7 +6,19 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-SURFACES = ("widgets", "elements", "document_types", "dynamic_tags")
+SURFACES = (
+    "widgets",
+    "elements",
+    "document_types",
+    "dynamic_tags",
+    "experiments",
+    "atomic_style_schema",
+    "atomic_dynamic_tags",
+    "global_classes",
+    "variables",
+    "components",
+    "interactions",
+)
 ENV_KEYS = ("wordpress", "php", "elementor", "elementor_pro", "theme", "theme_version", "active_devices", "active_breakpoints")
 
 
@@ -84,7 +96,7 @@ def compare(before: Dict[str, Any], after: Dict[str, Any]) -> Dict[str, Any]:
         impact = "no_change"
 
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "status": "changed" if changed else "no_change",
         "impact": impact,
         "environment": environment_changes,

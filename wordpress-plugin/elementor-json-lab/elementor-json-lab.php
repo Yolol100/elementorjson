@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 define( 'EJL_VERSION', '0.2.0' );
 define( 'EJL_FILE', __FILE__ );
 
+require_once __DIR__ . '/includes/class-atomic-capabilities.php';
 require_once __DIR__ . '/includes/class-widget-inventory.php';
 require_once __DIR__ . '/includes/class-cli-command.php';
 
