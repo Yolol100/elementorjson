@@ -8,6 +8,8 @@ For each run, bind the Elementor Core version, Elementor Pro version when loaded
 
 Release history and documentation can explain drift, but they do not prove that a widget, element, document type, tag or control exists in the current runtime. Classic widgets expose controls that can be checked against the generated inventory. Atomic/V4 typed props/styles remain on their dedicated typed validation path rather than being treated as Classic controls.
 
+When a previous trusted target/runtime inventory exists, compare it with the new inventory using `tools/compare_runtime_capabilities.py`. Treat removed capabilities, changed capability records/controls or removed plugins as `review_required`; additions and version changes are drift evidence that must be re-evaluated before reuse. This is the automatic change detector for installed Elementor, Pro and add-on capability surfaces; it complements, rather than replaces, current vendor/release research.
+
 ## Object-context routing
 
 Classify the Elementor object before selecting widgets/elements. Prefer an exact registered document type from `document_types`; the table below is a planning fallback when a target-specific type is not yet known.
@@ -19,6 +21,7 @@ Classify the Elementor object before selecting widgets/elements. Prefer an exact
 | Single Product | product identity, gallery, title, price, stock, variations, add-to-cart, meta/upsells as needed | Woo product widgets/dynamic tags | WooCommerce, product context, cart/action tests |
 | Product Archive / Shop | product archive context, listing, sorting/filtering/pagination | Archive/Loop/Product widgets, Woo filters when available | Woo query/archive context, filters and pagination |
 | Cart / Checkout / My Account | transactional/account flow and presentation only | registered Woo cart/checkout/account widgets/elements | high risk; Woo owns data/transactions; staging/sandbox required |
+| Section / Column / Inner Section | legacy V3 structural hierarchy, widths, alignment, gaps/spacing and responsive order | registered Section/Column/Inner Section plus minimal children | preserve legacy family during repair; no silent container migration |
 | Container | layout parent, direction, width, alignment, gap, responsive behavior | Container and child widgets/elements | do not add content widgets unless intent requires them |
 | Div block | Atomic structural wrapper | registered Atomic Div/Block plus typed children | V4/Atomic target evidence |
 | Flexbox | Atomic/Flex structural layout | registered Flexbox plus typed children | V4 props, wrap/direction/breakpoints |
@@ -34,7 +37,7 @@ Classify the Elementor object before selecting widgets/elements. Prefer an exact
 | Header | branding, navigation, search, primary action, optional account/cart/social | Site Logo, Menu/Nav, Search, Button, Social, Woo cart/account | Theme Builder conditions; responsive menu behavior |
 | Popup | focused message/CTA, optional form/countdown/media/navigation | Heading/Text/Button/Form/Countdown/Image/Video/Menu | triggers, close behavior, focus/keyboard, conditions |
 | Search Results | search context, result listing, query/pagination, empty state/refinement | Search, Archive Title, Archive Posts/Loop Grid | Search Results condition; no-results test |
-| Section | semantic section wrapper and only required content roles | Section/Container plus minimal content widgets | preserve V3/V4 family and page rhythm |
+| Section intent inside any document | semantic section wrapper and only required content roles | smallest registered structural/content composition | preserve V3/V4 family and page rhythm |
 
 The names above are role examples, not a static availability list. A candidate that is not registered in the exact runtime is unavailable.
 
@@ -85,6 +88,6 @@ Each applied repair records rule ID, affected path, before/after values and runt
 
 Use:
 
-`object context -> runtime capabilities -> section intent -> candidates -> capability intersection -> minimal plan -> audit -> safe repair -> readback -> re-audit -> importer/roundtrip/render evidence when applicable -> PASS|rollback`
+`object context -> runtime capabilities -> inventory drift check -> section intent -> candidates -> capability intersection -> minimal plan -> audit -> safe repair -> readback -> re-audit -> importer/roundtrip/render evidence when applicable -> PASS|rollback`
 
 After a repair, re-run the same audit. If validation worsens, a new error appears, importer/roundtrip/render evidence fails or uncertainty remains, discard the patched artifact and restore the source SHA baseline. Already-green sections remain frozen unless a later change can demonstrably affect them.
