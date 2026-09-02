@@ -29,6 +29,10 @@ class RuntimeCapabilityInventoryContractTest(unittest.TestCase):
             with self.subTest(expression=expression):
                 self.assertIn(expression, self.source)
 
+    def test_atomic_detection_uses_elementor_4_atomic_utils(self):
+        self.assertIn("Elementor\\\\Modules\\\\AtomicWidgets\\\\Utils\\\\Utils", self.source)
+        self.assertNotIn("Elementor\\\\Utils::is_atomic", self.source)
+
     def test_form_action_choices_are_bounded(self):
         self.assertIn("'submit_actions'", self.source)
         self.assertIn("array_slice( $keys, 0, 100 )", self.source)
