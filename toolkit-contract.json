@@ -3,7 +3,7 @@
   "owner_skill": "elementor",
   "project_id": "project-elementor",
   "repository": "Yolol100/elementorjson",
-  "evidence_role": "controlled_runtime_elementor_json_visual_target_and_render_validation",
+  "evidence_role": "controlled_runtime_elementor_json_visual_target_render_and_native_kit_validation",
   "requires_account": false,
   "requires_api_key": false,
   "requires_mcp": false,
@@ -19,6 +19,7 @@
     {"id":"hello-elementor","version":"3.5.1","trigger_when":"runtime evidence is required","outputs":["controlled render baseline"]},
     {"id":"template-library-import","version":"elementor-cli","trigger_when":"templates are supplied to runtime","outputs":["official import evidence"]},
     {"id":"semantic-roundtrip","version":"repo","trigger_when":"templates are imported","outputs":["artifacts/roundtrip"]},
+    {"id":"native-kit-customization-bridge","version":"repo","trigger_when":"exact-runtime native V4 Classes/Variables or mixed Website Template export/import evidence is required","outputs":["native Elementor Website Template ZIPs","native customization export/import reports","same-site media identity evidence"]},
     {"id":"playwright","version":"1.61.1","trigger_when":"rendered runtime evidence is required","outputs":["cross-browser responsive screenshots","DOM layout snapshots"]}
   ],
   "usage_assertions": [
@@ -35,6 +36,9 @@
     {"tool":"hello-elementor","path":".github/workflows/validate.yml","contains":"HELLO_ELEMENTOR_VERSION: '3.5.1'"},
     {"tool":"template-library-import","path":".github/workflows/validate.yml","contains":"elementor library import"},
     {"tool":"semantic-roundtrip","path":".github/workflows/validate.yml","contains":"compare_elementor_roundtrip.py"},
+    {"tool":"native-kit-customization-bridge","path":"wordpress-plugin/elementor-json-lab/includes/class-cli-command.php","contains":"get_component( 'import-export-customization' )"},
+    {"tool":"native-kit-customization-bridge","path":".github/workflows/native-kit-contract.yml","contains":"ejl native_kit_export"},
+    {"tool":"native-kit-customization-bridge","path":".github/workflows/native-kit-contract.yml","contains":"ejl native_kit_import"},
     {"tool":"playwright","path":"package.json","contains":"\"@playwright/test\": \"1.61.1\""},
     {"tool":"playwright","path":"tests/e2e/preview.spec.js","contains":"layout_snapshot"}
   ],
@@ -42,6 +46,8 @@
     "The visual-target builder and validator are source_prediction only: explicit/declared/inferred/unknown values never become browser observations by themselves.",
     "The accountless Free/Core path is complete without Elementor Pro.",
     "Elementor Pro remains an optional pre-existing secret/license path; this hardening does not add or require a new account, API key or MCP server.",
+    "The native-kit customization bridge invokes Elementor's own runtime component and registered runners; it does not define a parallel ZIP format and supports claims only for the exact runtime and feature states proven by the workflow.",
+    "Portable Elementor imports may remap media IDs; same-site existing-media reuse must preserve and live-validate the WordPress id+url pair.",
     "Controlled runtime evidence does not prove a client staging or production target.",
     "Accessibility acceptance remains owned by Website QA."
   ]
