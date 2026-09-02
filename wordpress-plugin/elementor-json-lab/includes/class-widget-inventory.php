@@ -60,8 +60,9 @@ final class Widget_Inventory {
 				continue;
 			}
 			$record = self::component_record( $element, (string) $name );
-			$record['atomic'] = class_exists( '\\Elementor\\Utils' ) && method_exists( '\\Elementor\\Utils', 'is_atomic' )
-				? (bool) \Elementor\Utils::is_atomic( $element )
+			$atomic_utils = '\\Elementor\\Modules\\AtomicWidgets\\Utils\\Utils';
+			$record['atomic'] = class_exists( $atomic_utils ) && method_exists( $atomic_utils, 'is_atomic' )
+				? (bool) $atomic_utils::is_atomic( $element )
 				: null;
 			$result[ (string) $name ] = $record;
 		}
