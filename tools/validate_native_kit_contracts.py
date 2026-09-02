@@ -6,6 +6,11 @@ import zipfile
 from pathlib import Path
 
 PROFILES = ("v3", "v4", "mixed")
+EXPECTED_VARIABLE_TYPES = {
+    "global-color-variable",
+    "global-font-variable",
+    "global-size-variable",
+}
 
 
 def load_json(path: Path):
@@ -65,6 +70,11 @@ def assert_snapshot_roundtrip(profile: str, expected: dict, actual: dict):
         raise AssertionError("v4 fixture does not contain both classes and variables")
     if profile == "mixed" and (not expected_v3 or not expected_classes or not expected_variables):
         raise AssertionError("mixed fixture does not contain V3 + classes + variables")
+    if profile in ("v4", "mixed"):
+        variable_types = {item.get("type") for item in expected_variables}
+        if not EXPECTED_VARIABLE_TYPES.issubset(variable_types):
+            missing = sorted(EXPECTED_VARIABLE_TYPES - variable_types)
+            raise AssertionError(f"{profile}: native variable coverage is missing {missing}")
 
 
 def validate_zip(profile: str, path: Path):
@@ -134,9 +144,12 @@ def validate_media_contracts(root: Path):
     gallery_nodes = [node for node in walk_elements(gallery.get("content", [])) if node.get("widgetType") == "image-gallery"]
     if len(gallery_nodes) != 1:
         raise AssertionError("gallery-control: expected exactly one Basic Gallery widget")
-    items = gallery_nodes[0].get("settings", {}).get("gallery")
+    settings = gallery_nodes[0].get("settings", {})
+    items = settings.get("wp_gallery")
     if not isinstance(items, list) or len(items) != 3:
-        raise AssertionError("gallery-control: expected exactly three gallery media items")
+        raise AssertionError("gallery-control: expected exactly three wp_gallery media items")
+    if settings.get("thumbnail_size") != "full":
+        raise AssertionError("gallery-control: expected the native thumbnail_size control")
     for index, item in enumerate(items):
         assert_media_value(item, f"gallery-control[{index}]")
 
@@ -146,7 +159,7 @@ def main():
     parser.add_argument("root", type=Path)
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
-    report = {"schema_version": "1.0", "profiles": {}, "media": "pending", "status": "fail"}
+    report = {"schema_version": "1.1", "profiles": {}, "media": "pending", "status": "fail"}
     for profile in PROFILES:
         names = validate_zip(profile, args.root / f"{profile}.zip")
         expected = load_json(args.root / f"expected-{profile}.json")
