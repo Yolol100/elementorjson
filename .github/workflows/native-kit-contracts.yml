@@ -112,6 +112,7 @@ jobs:
           script='/var/www/html/wp-content/plugins/elementor-json-lab/runtime/native-contract.php'
 
           for profile in v3 v4 mixed; do
+            npx wp-env run cli wp --user=admin eval '$manager=\Elementor\Plugin::instance()->kits_manager; $id=$manager->create(["post_title"=>"EJL Blank Import Boundary","settings"=>[]], []); update_option(\Elementor\Core\Kits\Manager::OPTION_ACTIVE, $id); if (! $id) { throw new RuntimeException("Could not create blank import boundary kit."); }'
             npx wp-env run cli wp --user=admin eval-file "$script" import "$profile" "$runtime/$profile.zip"
             npx wp-env run cli wp --user=admin eval-file "$script" snapshot ignored "$runtime/roundtrip-$profile.json"
           done
@@ -126,13 +127,19 @@ jobs:
           mkdir -p wordpress-plugin/elementor-json-lab/.runtime/native-contracts/media-observed
           npx wp-env run cli wp --user=admin eval-file "$script" media ignored "$observed_dir"
 
-      - name: Validate native contracts
+      - name: Collect native contract artifacts
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts/native-kit-contracts
-          cp -R wordpress-plugin/elementor-json-lab/.runtime/native-contracts/. artifacts/native-kit-contracts/
-          python tools/validate_native_kit_contracts.py artifacts/native-kit-contracts --report artifacts/native-kit-contracts/validation-report.json
+          if [ -d wordpress-plugin/elementor-json-lab/.runtime/native-contracts ]; then
+            cp -R wordpress-plugin/elementor-json-lab/.runtime/native-contracts/. artifacts/native-kit-contracts/
+          fi
+
+      - name: Validate native contracts
+        shell: bash
+        run: python tools/validate_native_kit_contracts.py artifacts/native-kit-contracts --report artifacts/native-kit-contracts/validation-report.json
 
       - name: Upload native Elementor contract artifacts
         if: always()
