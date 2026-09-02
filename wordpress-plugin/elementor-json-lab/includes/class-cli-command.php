@@ -124,6 +124,162 @@ final class CLI_Command {
 	}
 
 	/**
+	 * Export an Elementor Website Template through the current Import/Export Customization component.
+	 *
+	 * This deliberately calls Elementor's own customization export process so version-bound runners
+	 * such as Global Classes and Variables can participate when they are registered by that runtime.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <output>
+	 * : Absolute destination path for the ZIP file.
+	 *
+	 * [--include=<types>]
+	 * : Comma-separated internal Elementor include keys. Defaults to templates,content,settings.
+	 *
+	 * [--title=<title>]
+	 * : Kit title used in the native manifest.
+	 *
+	 * [--report=<path>]
+	 * : Optional JSON report containing the returned manifest and file metadata.
+	 */
+	public function native_kit_export( array $args, array $assoc_args ): void {
+		$output = isset( $args[0] ) ? (string) $args[0] : '';
+		if ( '' === $output ) {
+			\WP_CLI::error( 'An output ZIP path is required.' );
+			return;
+		}
+
+		$module = $this->get_import_export_customization_component();
+		if ( null === $module ) {
+			return;
+		}
+
+		$include = $this->parse_include( $assoc_args['include'] ?? 'templates,content,settings' );
+		if ( empty( $include ) ) {
+			\WP_CLI::error( 'At least one include key is required.' );
+			return;
+		}
+
+		$title = isset( $assoc_args['title'] ) ? sanitize_text_field( (string) $assoc_args['title'] ) : 'Elementor JSON Lab Runtime Kit';
+		if ( '' === $title ) {
+			$title = 'Elementor JSON Lab Runtime Kit';
+		}
+
+		$settings = array(
+			'include' => $include,
+			'kitInfo' => array(
+				'title'       => $title,
+				'description' => 'Controlled-runtime Elementor native import/export contract.',
+				'source'      => 'local',
+			),
+		);
+
+		try {
+			$result = $module->export_kit( $settings );
+		} catch ( \Throwable $exception ) {
+			\WP_CLI::error( 'Elementor customization export failed: ' . $exception->getMessage() );
+			return;
+		}
+
+		$source = isset( $result['file_name'] ) ? (string) $result['file_name'] : '';
+		if ( '' === $source || ! is_file( $source ) ) {
+			\WP_CLI::error( 'Elementor customization export did not return a readable ZIP file.' );
+			return;
+		}
+
+		$dir = dirname( $output );
+		if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
+			\WP_CLI::error( sprintf( 'Could not create output directory for %s', $output ) );
+			return;
+		}
+		if ( ! copy( $source, $output ) || ! is_file( $output ) || 0 === filesize( $output ) ) {
+			\WP_CLI::error( sprintf( 'Could not copy the native Elementor kit to %s', $output ) );
+			return;
+		}
+
+		if ( ! empty( $assoc_args['report'] ) ) {
+			$report = array(
+				'output'   => $output,
+				'bytes'    => filesize( $output ),
+				'include'  => $include,
+				'manifest' => $result['manifest'] ?? array(),
+			);
+			$json = wp_json_encode( $report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+			if ( false === $json || ! $this->write_json( (string) $assoc_args['report'], $json ) ) {
+				return;
+			}
+		}
+
+		if ( class_exists( '\\Elementor\\Plugin' ) && isset( \Elementor\Plugin::$instance->uploads_manager ) ) {
+			\Elementor\Plugin::$instance->uploads_manager->remove_file_or_dir( dirname( $source ) );
+		}
+
+		\WP_CLI::success( sprintf( 'Native Elementor customization kit exported to %s', $output ) );
+	}
+
+	/**
+	 * Import an Elementor Website Template through the current Import/Export Customization component.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <kit>
+	 * : Absolute path to a native Elementor Website Template ZIP.
+	 *
+	 * [--include=<types>]
+	 * : Comma-separated internal Elementor include keys. Defaults to templates,content,settings.
+	 *
+	 * [--report=<path>]
+	 * : Optional JSON report containing the imported-data response.
+	 */
+	public function native_kit_import( array $args, array $assoc_args ): void {
+		$path = isset( $args[0] ) ? (string) $args[0] : '';
+		if ( '' === $path || ! is_readable( $path ) ) {
+			\WP_CLI::error( 'A readable native Elementor kit ZIP path is required.' );
+			return;
+		}
+
+		$module = $this->get_import_export_customization_component();
+		if ( null === $module ) {
+			return;
+		}
+
+		$include = $this->parse_include( $assoc_args['include'] ?? 'templates,content,settings' );
+		if ( empty( $include ) ) {
+			\WP_CLI::error( 'At least one include key is required.' );
+			return;
+		}
+
+		try {
+			$result = $module->import_kit(
+				$path,
+				array(
+					'include'  => $include,
+					'referrer' => 'local',
+				),
+				false
+			);
+		} catch ( \Throwable $exception ) {
+			\WP_CLI::error( 'Elementor customization import failed: ' . $exception->getMessage() );
+			return;
+		}
+
+		if ( ! empty( $assoc_args['report'] ) ) {
+			$report = array(
+				'kit'           => basename( $path ),
+				'include'       => $include,
+				'imported_data' => $result,
+			);
+			$json = wp_json_encode( $report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+			if ( false === $json || ! $this->write_json( (string) $assoc_args['report'], $json ) ) {
+				return;
+			}
+		}
+
+		\WP_CLI::success( sprintf( 'Native Elementor customization kit imported from %s', $path ) );
+	}
+
+	/**
 	 * Render an Elementor export JSON file into an isolated WordPress page.
 	 *
 	 * ## OPTIONS
@@ -239,6 +395,31 @@ final class CLI_Command {
 		}
 
 		\WP_CLI::success( sprintf( 'Rendered %s at %s', basename( $template_path ), $url ) );
+	}
+
+	private function get_import_export_customization_component() {
+		if ( ! class_exists( '\\Elementor\\Plugin' ) || ! isset( \Elementor\Plugin::$instance->app ) ) {
+			\WP_CLI::error( 'Elementor App is not available in this runtime.' );
+			return null;
+		}
+
+		$module = \Elementor\Plugin::$instance->app->get_component( 'import-export-customization' );
+		if ( ! is_object( $module ) || ! method_exists( $module, 'export_kit' ) || ! method_exists( $module, 'import_kit' ) ) {
+			\WP_CLI::error( 'Elementor Import/Export Customization component is unavailable.' );
+			return null;
+		}
+
+		return $module;
+	}
+
+	private function parse_include( $value ): array {
+		$items = array_filter(
+			array_map(
+				'sanitize_key',
+				array_map( 'trim', explode( ',', (string) $value ) )
+			)
+		);
+		return array_values( array_unique( $items ) );
 	}
 
 	private function write_json( string $path, string $json ): bool {
