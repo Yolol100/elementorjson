@@ -31,7 +31,7 @@ try {
 			throw new RuntimeException( 'Operation must be reset, seed, export, snapshot or media.' );
 	}
 
-	if ( 'export' !== $operation && '' !== $output ) {
+	if ( ! in_array( $operation, array( 'export', 'media' ), true ) && '' !== $output ) {
 		$dir = dirname( $output );
 		if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
 			throw new RuntimeException( 'Could not create native contract output directory.' );
