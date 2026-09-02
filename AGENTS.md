@@ -24,9 +24,11 @@ Before changing or running Elementor JSON work:
 
 ## Trigger contract
 
-Use this repository when Elementor JSON needs real disposable-runtime evidence, including widget/dependency scanning, Visual Target artifacts, rendering, responsive screenshots/layout snapshots, Pro availability checks or import-behavior checks.
+Use this repository when Elementor JSON needs real disposable-runtime evidence, including widget/dependency scanning, Visual Target artifacts, rendering, responsive screenshots/layout snapshots, Pro availability checks, import-behavior checks, same-site media identity checks or exact-runtime native Website Template/Design System package checks.
 
-Do not turn a source-only task into a runtime run unless a runtime/visual claim is actually needed. Do not use this repository for production or live-site mutation.
+For V4 Classes/Variables or mixed V3/V4 native package claims, use the runtime's own Elementor `import-export-customization` component through the generic EJL bridge. Keep the documented `wp elementor kit export` route as a separate legacy V3 CLI contract; do not promote it to V4 evidence when the runtime does not do so itself.
+
+Do not turn a source-only task into a runtime run unless a runtime/visual/package claim is actually needed. Do not use this repository for production or live-site mutation.
 
 ## Privacy
 
@@ -46,6 +48,8 @@ Use GitHub Actions secrets for credentials and sanitized fixtures for public-rep
 - Preserve V3/V4/Atomic family unless migration is explicit and proven.
 - Treat target inventory as availability evidence, not as proof of visual target equality.
 - Third-party widgets require the matching add-on in the runtime before visual rendering can be called verified.
+- Native package evidence is bound to the exact Elementor version and feature states captured by that controlled runtime.
+- Portable imports may migrate media and allocate new attachment IDs; same-site existing-media reuse must preserve and live-validate the WordPress `id + url` pair.
 - A green repository run is `controlled_runtime` evidence only. It is not `target_verified`, staging proof or production proof.
 
 ## Required checks
@@ -59,14 +63,17 @@ python -m unittest discover -s tests -p 'test_*.py' -v
 For changes that affect Visual Target contracts/building, composition wiring, runtime contract, workflow, scanner plugin, rendering, Playwright tests or integration documentation, require the relevant GitHub Actions workflows to pass:
 
 - `Page Composition Contract` — repository contracts, composition lint and Visual Target artifacts;
-- `Elementor JSON QA` — `Static JSON audit` and `Elementor runtime preview`.
+- `Elementor JSON QA` — `Static JSON audit` and `Elementor runtime preview`;
+- `Native Elementor Kit Contract` — required when native Kit/Design-System behavior, the EJL native-kit bridge, V4 feature gating, media identity, native package workflow or its documented contract is changed.
 
-The runtime job must start WordPress/Elementor, export widget inventory, audit/import/roundtrip templates, render them, capture desktop/tablet/mobile + active-breakpoint screenshots and layout metadata, and upload artifacts.
+The standard runtime job must start WordPress/Elementor, export widget inventory, audit/import/roundtrip templates, render them, capture desktop/tablet/mobile + active-breakpoint screenshots and layout metadata, and upload artifacts.
+
+The native-kit job must use the pinned runtime, enable required V4 features before Elementor boot when V4 evidence is in scope, keep the documented V3 CLI package route separate, exercise Elementor's own `import-export-customization` component for V4/mixed export-import-reexport, verify Global Classes/Variables readback, verify same-site Image/Background/Basic Gallery media identity, and upload run-scoped artifacts.
 
 ## Change rules
 
-- Keep `runtime-contract.json`, `toolkit-contract.json`, README, `docs/project-elementor-integration.md`, contracts and workflows aligned.
-- Fail closed on unknown widgets, invalid JSON, failed render or failed browser tests.
+- Keep `runtime-contract.json`, `toolkit-contract.json`, README, `docs/project-elementor-integration.md`, `AGENTS.md`, contracts and workflows aligned.
+- Fail closed on unknown widgets, invalid JSON, failed render, failed native-package verification or failed browser tests.
 - Repair only confirmed defects. Do not guess unknown Atomic, Pro, add-on or site-bound data.
 - Keep Pro credentials outside the repository; `ELEMENTOR_PRO_LICENSE_KEY` may exist only as a GitHub Actions secret.
 - Preserve evidence boundaries in every report or documentation change.
