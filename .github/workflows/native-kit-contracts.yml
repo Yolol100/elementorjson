@@ -101,7 +101,7 @@ jobs:
           for profile in v3 v4 mixed; do
             npx wp-env run cli wp --user=admin eval-file "$script" seed "$profile"
             if [ "$profile" != 'v3' ]; then
-              npx wp-env run cli wp --user=admin eval '$kit=\Elementor\Plugin::instance()->kits_manager->get_active_kit(); $repo=\Elementor\Modules\GlobalClasses\Global_Classes_Repository::make($kit); $repo->put(["g-ejl-card"=>["id"=>"g-ejl-card","type"=>"class","label"=>"EJL Card","variants"=>[["meta"=>["breakpoint"=>"desktop","state"=>null],"props"=>["display"=>["$$type"=>"string","value"=>"block"]]]]]],["g-ejl-card"]);'
+              npx wp-env run cli wp --user=admin eval '$kit=\Elementor\Plugin::instance()->kits_manager->get_active_kit(); $repo=\Elementor\Modules\GlobalClasses\Global_Classes_Repository::make($kit); $repo->put(["g-ejl-card"=>["id"=>"g-ejl-card","type"=>"class","label"=>"EJL Card","variants"=>[["meta"=>["breakpoint"=>"desktop","state"=>null],"props"=>["display"=>["\$\$type"=>"string","value"=>"block"]]]]]],["g-ejl-card"]);'
             fi
             npx wp-env run cli wp --user=admin eval-file "$script" snapshot ignored "$runtime/expected-$profile.json"
             npx wp-env run cli wp --user=admin eval-file "$script" export "$profile" "$runtime/$profile.zip"
