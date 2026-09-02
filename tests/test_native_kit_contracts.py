@@ -61,6 +61,10 @@ class NativeKitContractTests(unittest.TestCase):
             (observed / "gallery-control.json").write_text(json.dumps(self.media_document("gallery")), encoding="utf-8")
             module.validate_media_contracts(root)
 
+    def test_empty_native_variable_list_is_treated_as_empty_collection(self):
+        snapshot = {"v4": {"variables": []}}
+        self.assertEqual([], module.normalize_variables(snapshot))
+
     def test_v3_gap_canonicalization_is_semantically_stable(self):
         expected = {
             "v3": {
@@ -79,7 +83,7 @@ class NativeKitContractTests(unittest.TestCase):
                     "isLinked": True,
                 },
             },
-            "v4": {"classes": {}, "variables": {}},
+            "v4": {"classes": {}, "variables": []},
         }
         module.assert_snapshot_roundtrip("v3", expected, actual)
 
