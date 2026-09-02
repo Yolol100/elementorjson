@@ -60,11 +60,17 @@ jobs:
       - name: Start WordPress runtime
         run: npx wp-env start
 
-      - name: Install pinned Elementor runtime
+      - name: Install pinned Elementor runtime with V4 export features active at boot
         shell: bash
         run: |
           set -euo pipefail
-          npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION" --activate
+          npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION"
+          # Elementor 4.2.4 registers the Atomic/Classes/Variables import-export runners during boot.
+          # Persist the experiment states before activation so the runners are actually registered.
+          npx wp-env run cli wp option update elementor_experiment-e_atomic_elements active
+          npx wp-env run cli wp option update elementor_experiment-e_classes active
+          npx wp-env run cli wp option update elementor_experiment-e_variables active
+          npx wp-env run cli wp plugin activate elementor
           npx wp-env run cli wp plugin activate elementor-json-lab
           npx wp-env run cli wp theme install hello-elementor -- --version="$HELLO_ELEMENTOR_VERSION" --activate
           npx wp-env run cli wp user get admin --field=ID
@@ -74,7 +80,8 @@ jobs:
         run: |
           set -euo pipefail
           npx wp-env run cli wp --user=admin ejl render /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/smoke-heading.json --slug=ejl-native-v3 --page-template=elementor_canvas
-          npx wp-env run cli wp --user=admin elementor kit export /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/01-v3-only.zip --include=site-settings,content
+          # Elementor 4.2.4's export process uses the internal include key "settings".
+          npx wp-env run cli wp --user=admin elementor kit export /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/01-v3-only.zip --include=settings,content
           test -s wordpress-plugin/elementor-json-lab/.runtime/native-contract/01-v3-only.zip
           cp wordpress-plugin/elementor-json-lab/.runtime/native-contract/01-v3-only.zip artifacts/native-kit-contract/
 
@@ -109,9 +116,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wp-env run cli wp --user=admin elementor kit export /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/02-v4-design-system.zip --include=site-settings
+          # The 4.2.4 WP-CLI help says "site-settings", but its export process and V4 runners check "settings".
+          npx wp-env run cli wp --user=admin elementor kit export /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/02-v4-design-system.zip --include=settings
           mkdir -p artifacts/native-kit-contract/v4-extracted
           unzip -q wordpress-plugin/elementor-json-lab/.runtime/native-contract/02-v4-design-system.zip -d artifacts/native-kit-contract/v4-extracted
+          unzip -l wordpress-plugin/elementor-json-lab/.runtime/native-contract/02-v4-design-system.zip > artifacts/native-kit-contract/v4-file-list.txt
           grep -R -F -q 'e-gv-ejlfixture' artifacts/native-kit-contract/v4-extracted
           grep -R -F -q 'e-gc-ejlfixture' artifacts/native-kit-contract/v4-extracted
           grep -R -F -q 'ejlPrimary' artifacts/native-kit-contract/v4-extracted
@@ -172,6 +181,7 @@ jobs:
               'same_site_media_id_url_readback': 'pass',
               'native_mixed_import_readback': 'pass',
               'native_reexport_contains_v4_fixtures': 'pass',
+              'v4_export_gate': 'Atomic Elements, Global Classes and Variables are activated before Elementor boot; settings-only export uses the 4.2.4 internal include key settings.',
               'portable_media_note': 'Portable Elementor imports may migrate media and therefore may assign new attachment ids; same-site target reuse must preserve and live-validate existing id+url.',
               'files': files,
               'limitations': ['Disposable controlled runtime, not customer staging.']}
