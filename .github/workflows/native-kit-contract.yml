@@ -1,0 +1,237 @@
+name: Native Elementor Kit Contract
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/native-kit-contract.yml'
+      - 'wordpress-plugin/elementor-json-lab/tests/runtime/native-*.php'
+      - 'wordpress-plugin/elementor-json-lab/tests/runtime/reset-native-v4-fixtures.php'
+      - 'wordpress-plugin/elementor-json-lab/tests/runtime/assert-native-kit-import.php'
+      - 'templates/smoke-heading.json'
+      - 'templates/smoke-atomic.json'
+      - 'tools/compare_elementor_roundtrip.py'
+      - '.wp-env.json'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/native-kit-contract.yml'
+      - 'wordpress-plugin/elementor-json-lab/tests/runtime/native-*.php'
+      - 'wordpress-plugin/elementor-json-lab/tests/runtime/reset-native-v4-fixtures.php'
+      - 'wordpress-plugin/elementor-json-lab/tests/runtime/assert-native-kit-import.php'
+      - 'templates/smoke-heading.json'
+      - 'templates/smoke-atomic.json'
+      - 'tools/compare_elementor_roundtrip.py'
+      - '.wp-env.json'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ELEMENTOR_CORE_VERSION: '4.2.4'
+  HELLO_ELEMENTOR_VERSION: '3.5.1'
+
+jobs:
+  native-kit-contract:
+    name: Native export import roundtrip
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Install locked tooling
+        run: npm ci --no-fund
+
+      - name: Prepare runtime artifact directory
+        run: mkdir -p wordpress-plugin/elementor-json-lab/.runtime/native-contract artifacts/native-kit-contract
+
+      - name: Start WordPress runtime
+        run: npx wp-env start
+
+      - name: Install pinned Elementor runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION" --activate
+          npx wp-env run cli wp plugin activate elementor-json-lab
+          npx wp-env run cli wp theme install hello-elementor -- --version="$HELLO_ELEMENTOR_VERSION" --activate
+          npx wp-env run cli wp rewrite structure '/%postname%/'
+          npx wp-env run cli wp rewrite flush --hard
+          npx wp-env run cli wp user get admin --field=ID
+
+      - name: Build clean V3 page and native V3 kit
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp --user=admin ejl render \
+            /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/smoke-heading.json \
+            --slug=ejl-native-v3 \
+            --page-template=elementor_canvas
+          npx wp-env run cli wp --user=admin elementor kit export \
+            /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/01-v3-only.zip \
+            --include=site-settings,content
+          test -s wordpress-plugin/elementor-json-lab/.runtime/native-contract/01-v3-only.zip
+
+      - name: Generate live WordPress media controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp --user=admin eval-file \
+            /var/www/html/wp-content/plugins/elementor-json-lab/tests/runtime/native-media-fixtures.php
+          test -s wordpress-plugin/elementor-json-lab/.runtime/native-contract/media-controls-source.json
+          npx wp-env run cli wp --user=admin elementor library import \
+            /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/media-controls-source.json \
+            --returnType=ids
+          npx wp-env run cli wp --user=admin ejl export_library \
+            --source-template=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/media-controls-source.json \
+            --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/media-controls-roundtrip.json
+          python tools/compare_elementor_roundtrip.py \
+            wordpress-plugin/elementor-json-lab/.runtime/native-contract/media-controls-source.json \
+            wordpress-plugin/elementor-json-lab/.runtime/native-contract/media-controls-roundtrip.json \
+            --output artifacts/native-kit-contract/media-controls-roundtrip-report.json
+          python tools/validate_elementor_deep.py \
+            wordpress-plugin/elementor-json-lab/.runtime/native-contract/media-controls-roundtrip.json \
+            --output artifacts/native-kit-contract/media-controls-deep.json
+
+      - name: Seed V4 design system and Atomic page
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp --user=admin eval-file \
+            /var/www/html/wp-content/plugins/elementor-json-lab/tests/runtime/native-v4-fixtures.php
+          npx wp-env run cli wp --user=admin ejl render \
+            /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/smoke-atomic.json \
+            --slug=ejl-native-v4 \
+            --page-template=elementor_canvas
+          test -s wordpress-plugin/elementor-json-lab/.runtime/native-contract/v4-fixture-state.json
+
+      - name: Export mixed native Elementor Website Template
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp --user=admin elementor kit export \
+            /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/03-mixed-v3-v4.zip
+          test -s wordpress-plugin/elementor-json-lab/.runtime/native-contract/03-mixed-v3-v4.zip
+          unzip -l wordpress-plugin/elementor-json-lab/.runtime/native-contract/03-mixed-v3-v4.zip \
+            > artifacts/native-kit-contract/mixed-file-list.txt
+
+      - name: Inspect native package contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/native-kit-contract/v3-extracted artifacts/native-kit-contract/mixed-extracted
+          mkdir -p artifacts/native-kit-contract/v3-extracted artifacts/native-kit-contract/mixed-extracted
+          unzip -q wordpress-plugin/elementor-json-lab/.runtime/native-contract/01-v3-only.zip \
+            -d artifacts/native-kit-contract/v3-extracted
+          unzip -q wordpress-plugin/elementor-json-lab/.runtime/native-contract/03-mixed-v3-v4.zip \
+            -d artifacts/native-kit-contract/mixed-extracted
+          if grep -R -F -q 'e-gv-ejlfixture' artifacts/native-kit-contract/v3-extracted; then
+            echo 'V3-only export unexpectedly contains the V4 Variable fixture.' >&2
+            exit 1
+          fi
+          if grep -R -F -q 'e-gc-ejlfixture' artifacts/native-kit-contract/v3-extracted; then
+            echo 'V3-only export unexpectedly contains the V4 Global Class fixture.' >&2
+            exit 1
+          fi
+          grep -R -F -q 'e-gv-ejlfixture' artifacts/native-kit-contract/mixed-extracted
+          grep -R -F -q 'e-gc-ejlfixture' artifacts/native-kit-contract/mixed-extracted
+          grep -R -F -q 'ejlPrimary' artifacts/native-kit-contract/mixed-extracted
+          grep -R -F -q 'EJLFixture' artifacts/native-kit-contract/mixed-extracted
+          cp wordpress-plugin/elementor-json-lab/.runtime/native-contract/01-v3-only.zip artifacts/native-kit-contract/
+          cp wordpress-plugin/elementor-json-lab/.runtime/native-contract/03-mixed-v3-v4.zip artifacts/native-kit-contract/
+          cp wordpress-plugin/elementor-json-lab/.runtime/native-contract/media-controls-source.json artifacts/native-kit-contract/
+          cp wordpress-plugin/elementor-json-lab/.runtime/native-contract/media-controls-roundtrip.json artifacts/native-kit-contract/
+          cp wordpress-plugin/elementor-json-lab/.runtime/native-contract/media-fixture-state.json artifacts/native-kit-contract/
+          cp wordpress-plugin/elementor-json-lab/.runtime/native-contract/v4-fixture-state.json artifacts/native-kit-contract/
+
+      - name: Reset V4 state and native-import mixed kit
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp --user=admin eval-file \
+            /var/www/html/wp-content/plugins/elementor-json-lab/tests/runtime/reset-native-v4-fixtures.php
+          npx wp-env run cli wp --user=admin elementor kit import \
+            /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/03-mixed-v3-v4.zip
+          npx wp-env run cli wp --user=admin eval-file \
+            /var/www/html/wp-content/plugins/elementor-json-lab/tests/runtime/assert-native-kit-import.php
+
+      - name: Re-export imported native kit
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp --user=admin elementor kit export \
+            /var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contract/04-mixed-reexport.zip
+          test -s wordpress-plugin/elementor-json-lab/.runtime/native-contract/04-mixed-reexport.zip
+          rm -rf artifacts/native-kit-contract/reexport-extracted
+          mkdir -p artifacts/native-kit-contract/reexport-extracted
+          unzip -q wordpress-plugin/elementor-json-lab/.runtime/native-contract/04-mixed-reexport.zip \
+            -d artifacts/native-kit-contract/reexport-extracted
+          grep -R -F -q 'e-gv-ejlfixture' artifacts/native-kit-contract/reexport-extracted
+          grep -R -F -q 'e-gc-ejlfixture' artifacts/native-kit-contract/reexport-extracted
+          cp wordpress-plugin/elementor-json-lab/.runtime/native-contract/04-mixed-reexport.zip artifacts/native-kit-contract/
+
+      - name: Write evidence summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path('artifacts/native-kit-contract')
+          files = {}
+          for name in ['01-v3-only.zip', '03-mixed-v3-v4.zip', '04-mixed-reexport.zip', 'media-controls-roundtrip.json']:
+              path = root / name
+              files[name] = {
+                  'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                  'bytes': path.stat().st_size,
+              }
+          summary = {
+              'evidence_class': 'controlled_runtime',
+              'wordpress': '7.1',
+              'elementor': '4.2.4',
+              'v3_native_export': 'pass',
+              'media_template_library_roundtrip': 'pass',
+              'v4_variable_global_class_native_export': 'pass',
+              'native_mixed_import_readback': 'pass',
+              'native_reexport_contains_v4_fixtures': 'pass',
+              'files': files,
+              'limitations': [
+                  'This is a disposable controlled runtime, not customer staging.',
+                  'Elementor Pro is not required for this Core design-system contract.',
+              ],
+          }
+          (root / 'evidence-summary.json').write_text(json.dumps(summary, indent=2) + '\n')
+          PY
+
+      - name: Upload native kit contract artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-elementor-kit-contract
+          path: artifacts/native-kit-contract
+          if-no-files-found: error
+
+      - name: Stop WordPress environment
+        if: always()
+        run: npx wp-env stop || true
