@@ -17,15 +17,35 @@ def load_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def normalize_v3_setting(key, value):
+    if key == "space_between_widgets" and isinstance(value, dict):
+        return {
+            "unit": value.get("unit"),
+            "size": value.get("size"),
+            "sizes": value.get("sizes", []),
+        }
+    return value
+
+
 def nonempty_v3(snapshot):
     values = snapshot.get("v3", {})
-    return {k: v for k, v in values.items() if v not in (None, "", [], {})}
+    return {
+        key: normalize_v3_setting(key, value)
+        for key, value in values.items()
+        if value not in (None, "", [], {})
+    }
 
 
 def normalize_classes(snapshot):
     out = []
     classes = snapshot.get("v4", {}).get("classes", {})
-    for item in classes.values():
+    if isinstance(classes, list):
+        iterable = classes
+    elif isinstance(classes, dict):
+        iterable = classes.values()
+    else:
+        iterable = []
+    for item in iterable:
         if not isinstance(item, dict):
             continue
         out.append({"label": item.get("label"), "type": item.get("type"), "variants": item.get("variants", [])})
@@ -159,13 +179,17 @@ def main():
     parser.add_argument("root", type=Path)
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
-    report = {"schema_version": "1.1", "profiles": {}, "media": "pending", "status": "fail"}
+    report = {"schema_version": "1.2", "profiles": {}, "media": "pending", "status": "fail"}
     for profile in PROFILES:
         names = validate_zip(profile, args.root / f"{profile}.zip")
         expected = load_json(args.root / f"expected-{profile}.json")
         actual = load_json(args.root / f"roundtrip-{profile}.json")
         assert_snapshot_roundtrip(profile, expected, actual)
-        report["profiles"][profile] = {"zip_members": names, "roundtrip": "pass"}
+        report["profiles"][profile] = {
+            "zip_members": names,
+            "roundtrip": "pass",
+            "native_normalizations": ["space_between_widgets: canonical column/row/isLinked fields may be added"] if profile in ("v3", "mixed") else [],
+        }
     validate_media_contracts(args.root)
     report["media"] = "pass"
     report["status"] = "pass"
