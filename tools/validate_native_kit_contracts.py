@@ -55,7 +55,13 @@ def normalize_classes(snapshot):
 def normalize_variables(snapshot):
     out = []
     variables = snapshot.get("v4", {}).get("variables", {})
-    for item in variables.values():
+    if isinstance(variables, list):
+        iterable = variables
+    elif isinstance(variables, dict):
+        iterable = variables.values()
+    else:
+        iterable = []
+    for item in iterable:
         if not isinstance(item, dict):
             continue
         out.append({
