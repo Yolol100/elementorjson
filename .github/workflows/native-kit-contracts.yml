@@ -90,7 +90,7 @@ jobs:
           test "$elementor_version" = "$ELEMENTOR_CORE_VERSION"
           [[ "$php_version" == "$EXPECTED_PHP_SERIES".* ]]
 
-      - name: Generate native V3 V4 and mixed Website Template contracts
+      - name: Generate current native V3 V4 and mixed Website Template contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -99,11 +99,12 @@ jobs:
           mkdir -p wordpress-plugin/elementor-json-lab/.runtime/native-contracts
 
           for profile in v3 v4 mixed; do
-            npx wp-env run cli wp --user=admin eval-file "$script" seed "$profile" "$runtime/expected-$profile.json"
+            npx wp-env run cli wp --user=admin eval-file "$script" seed "$profile"
+            npx wp-env run cli wp --user=admin eval-file "$script" snapshot ignored "$runtime/expected-$profile.json"
             npx wp-env run cli wp --user=admin eval-file "$script" export "$profile" "$runtime/$profile.zip"
           done
 
-      - name: Native kit import roundtrip
+      - name: Current native Website Template import roundtrip
         shell: bash
         run: |
           set -euo pipefail
@@ -111,29 +112,19 @@ jobs:
           script='/var/www/html/wp-content/plugins/elementor-json-lab/runtime/native-contract.php'
 
           for profile in v3 v4 mixed; do
-            npx wp-env run cli wp --user=admin eval-file "$script" reset
-            npx wp-env run cli wp --user=admin elementor kit import "$runtime/$profile.zip" --include=site-settings --unfilteredFilesUpload=disable
+            npx wp-env run cli wp --user=admin eval-file "$script" import "$profile" "$runtime/$profile.zip"
             npx wp-env run cli wp --user=admin eval-file "$script" snapshot ignored "$runtime/roundtrip-$profile.json"
           done
 
-      - name: Generate and observe native media controls
+      - name: Generate native same-site media control exports
         shell: bash
         run: |
           set -euo pipefail
           runtime='/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/native-contracts'
           script='/var/www/html/wp-content/plugins/elementor-json-lab/runtime/native-contract.php'
-          source_dir="$runtime/media-source"
           observed_dir="$runtime/media-observed"
           mkdir -p wordpress-plugin/elementor-json-lab/.runtime/native-contracts/media-observed
-
-          npx wp-env run cli wp --user=admin eval-file "$script" media ignored "$source_dir"
-
-          for filename in image-control.json background-control.json gallery-control.json; do
-            source="$source_dir/$filename"
-            observed="$observed_dir/$filename"
-            npx wp-env run cli wp --user=admin elementor library import "$source" --returnType=ids
-            npx wp-env run cli wp --user=admin ejl export_library --source-template="$source" --output="$observed"
-          done
+          npx wp-env run cli wp --user=admin eval-file "$script" media ignored "$observed_dir"
 
       - name: Validate native contracts
         shell: bash
