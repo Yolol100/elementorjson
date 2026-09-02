@@ -15,7 +15,13 @@ class NativeKitContractTests(unittest.TestCase):
     def fixture_snapshot(self, profile):
         v3 = {"container_width": {"unit": "px", "size": 1180, "sizes": []}} if profile in ("v3", "mixed") else {}
         classes = {"g-test": {"id": "g-test", "type": "class", "label": "Test", "variants": []}} if profile in ("v4", "mixed") else {}
-        variables = {"e-gv-test": {"type": "global-color-variable", "label": "test", "value": "#123456", "order": 1, "sync_to_v3": False}} if profile in ("v4", "mixed") else {}
+        variables = {}
+        if profile in ("v4", "mixed"):
+            variables = {
+                "e-gv-color": {"type": "global-color-variable", "label": "color", "value": "#123456", "order": 1, "sync_to_v3": False},
+                "e-gv-font": {"type": "global-font-variable", "label": "font", "value": "Arial", "order": 2, "sync_to_v3": False},
+                "e-gv-size": {"type": "global-size-variable", "label": "size", "value": "1.5rem", "order": 3, "sync_to_v3": False},
+            }
         return {"v3": v3, "v4": {"classes": classes, "variables": variables}}
 
     def write_zip(self, path, profile):
@@ -34,7 +40,7 @@ class NativeKitContractTests(unittest.TestCase):
         elif kind == "background":
             content = [{"elType": "container", "settings": {"background_image": media}, "elements": []}]
         else:
-            content = [{"widgetType": "image-gallery", "settings": {"gallery": [media, media, media]}, "elements": []}]
+            content = [{"widgetType": "image-gallery", "settings": {"wp_gallery": [media, media, media], "thumbnail_size": "full"}, "elements": []}]
         return {"content": content}
 
     def test_profiles_and_media_contracts(self):
