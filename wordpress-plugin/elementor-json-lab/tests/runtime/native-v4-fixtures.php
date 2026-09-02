@@ -2,13 +2,30 @@
 
 defined( 'ABSPATH' ) || exit;
 
+use Elementor\Modules\AtomicWidgets\Module as Atomic_Widgets_Module;
 use Elementor\Modules\GlobalClasses\Global_Classes_Repository;
+use Elementor\Modules\GlobalClasses\Module as Global_Classes_Module;
+use Elementor\Modules\Variables\Module as Variables_Module;
 use Elementor\Modules\Variables\PropTypes\Color_Variable_Prop_Type;
 use Elementor\Modules\Variables\Storage\Entities\Variable;
 use Elementor\Modules\Variables\Storage\Variables_Repository;
 
 if ( ! class_exists( '\\Elementor\\Plugin' ) ) {
 	throw new RuntimeException( 'Elementor is not loaded.' );
+}
+
+$required_features = [
+	Atomic_Widgets_Module::EXPERIMENT_NAME,
+	Global_Classes_Module::NAME,
+	Variables_Module::EXPERIMENT_NAME,
+];
+$feature_states = [];
+foreach ( $required_features as $feature_name ) {
+	$is_active = \Elementor\Plugin::$instance->experiments->is_feature_active( $feature_name );
+	$feature_states[ $feature_name ] = $is_active ? 'active' : 'inactive';
+	if ( ! $is_active ) {
+		throw new RuntimeException( sprintf( 'Required Elementor feature is inactive at boot: %s', $feature_name ) );
+	}
 }
 
 $kit = \Elementor\Plugin::$instance->kits_manager->get_active_kit();
@@ -69,14 +86,15 @@ if ( null === $class_state || ! isset( $variable_state['data'][ $variable_id ] )
 }
 
 $state = [
-	'variable_id' => $variable_id,
-	'class_id'    => $class_id,
-	'variables'   => $variable_state,
-	'class'       => $class_state,
+	'feature_states' => $feature_states,
+	'variable_id'    => $variable_id,
+	'class_id'       => $class_id,
+	'variables'      => $variable_state,
+	'class'          => $class_state,
 ];
 $json = wp_json_encode( $state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
 if ( false === $json || false === file_put_contents( $runtime_dir . '/v4-fixture-state.json', $json . PHP_EOL ) ) {
 	throw new RuntimeException( 'Could not write V4 fixture state.' );
 }
 
-WP_CLI::success( 'Native V4 Variable and Global Class fixture created and read back.' );
+WP_CLI::success( 'Native V4 Variable and Global Class fixture created and read back with export features active.' );
