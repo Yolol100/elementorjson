@@ -61,6 +61,28 @@ class NativeKitContractTests(unittest.TestCase):
             (observed / "gallery-control.json").write_text(json.dumps(self.media_document("gallery")), encoding="utf-8")
             module.validate_media_contracts(root)
 
+    def test_v3_gap_canonicalization_is_semantically_stable(self):
+        expected = {
+            "v3": {
+                "space_between_widgets": {"unit": "px", "size": 20, "sizes": []},
+            },
+            "v4": {"classes": {}, "variables": {}},
+        }
+        actual = {
+            "v3": {
+                "space_between_widgets": {
+                    "unit": "px",
+                    "size": 20,
+                    "sizes": [],
+                    "column": "20",
+                    "row": "20",
+                    "isLinked": True,
+                },
+            },
+            "v4": {"classes": {}, "variables": {}},
+        }
+        module.assert_snapshot_roundtrip("v3", expected, actual)
+
     def test_v3_rejects_v4_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "v3.zip"
