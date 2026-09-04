@@ -33,7 +33,7 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Resolve only the declared security overrides
+      - name: Resolve declared security overrides
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Verify clean installation and dependency audit
