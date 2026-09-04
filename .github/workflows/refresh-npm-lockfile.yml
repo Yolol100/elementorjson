@@ -1,0 +1,56 @@
+name: Refresh npm lockfile for security overrides
+
+on:
+  push:
+    branches:
+      - cleanup/private-runtime-docs-2026-09-04
+    paths:
+      - package.json
+      - .github/workflows/refresh-npm-lockfile.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-npm-lockfile-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  refresh-lockfile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: cleanup/private-runtime-docs-2026-09-04
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Resolve only the declared security overrides
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Verify clean installation and dependency audit
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm audit --audit-level=high
+
+      - name: Commit generated lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo 'package-lock.json already matches package.json overrides'
+            exit 0
+          fi
+          git commit -m 'Refresh npm lockfile for security overrides'
+          git push origin HEAD:cleanup/private-runtime-docs-2026-09-04
