@@ -1,3 +1,4 @@
+# Temporary workflow installed on main for this single security refresh.
 name: Refresh npm lockfile for security overrides
 
 on:
