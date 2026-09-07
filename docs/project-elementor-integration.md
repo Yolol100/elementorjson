@@ -61,8 +61,12 @@ Do not compare on visual intuition alone when exact DOM geometry exists. Do not 
 
 ## Privacy and target boundaries
 
-The repository is public. Never commit confidential client JSON/screenshots, credentials, personal data, secret URLs or confidential inventories. Sensitive artifacts require a private runtime or exact site route. A green run remains controlled-runtime evidence only; it does not prove customer staging, target IDs/globals/conditions/dynamic values, production behavior, full accessibility or pixel-perfect equality without an approved reference. Native V4 package success also does not prove a different target where Elementor version, feature states or registered runners differ.
+Verify current repository visibility before execution; private storage does not authorize unrestricted client data. Never commit confidential client JSON/screenshots, credentials, personal data, secret URLs or confidential inventories. Sensitive artifacts require a private runtime or exact site route. A green run remains controlled-runtime evidence only; it does not prove customer staging, target IDs/globals/conditions/dynamic values, production behavior, full accessibility or pixel-perfect equality without an approved reference. Native V4 package success also does not prove a different target where Elementor version, feature states or registered runners differ.
 
 ## Final gate
 
 After the last implementation change, require two stable green final controlled-runtime rounds before staging/release handoff. For target or release claims, continue through `website-qa-checklist` rather than upgrading controlled-runtime evidence by wording.
+
+## Toolkit integrity
+
+Usage assertions must name a registered tool, use non-empty string fields and point to a UTF-8 file inside this repository. Absolute paths, traversal and symlink escapes are invalid evidence. Malformed contracts return validation errors before runtime execution.

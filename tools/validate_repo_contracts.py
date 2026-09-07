@@ -121,7 +121,9 @@ def validate_toolkit(value, root=Path(".")):
     if not isinstance(tools, list) or not tools:
         errors.append("toolkit-contract.json: tools must be a non-empty list")
     else:
-        ids = [item.get("id") for item in tools if isinstance(item, dict)]
+        ids = [item.get("id") for item in tools if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].strip()]
+        if len(ids) != len(tools):
+            errors.append("toolkit-contract.json: every tool requires a non-empty string ID")
         if len(ids) != len(set(ids)):
             errors.append("toolkit-contract.json: tool IDs must be unique")
         for required_tool in REQUIRED_TOOL_IDS:
@@ -134,17 +136,28 @@ def validate_toolkit(value, root=Path(".")):
         errors.append("toolkit-contract.json: usage_assertions must be a non-empty list")
     else:
         for index, assertion in enumerate(assertions):
-            if not isinstance(assertion, dict) or not assertion.get("tool") or not assertion.get("path") or not assertion.get("contains"):
+            if not isinstance(assertion, dict) or not all(isinstance(assertion.get(key), str) and assertion[key].strip() for key in ("tool", "path", "contains")):
                 errors.append("toolkit-contract.json: every usage assertion must bind tool/path/contains")
                 continue
             assertion_tools.add(assertion["tool"])
-            assertion_path = root / assertion["path"]
+            if assertion["tool"] not in ids:
+                errors.append(f"toolkit-contract.json: unknown assertion tool at index {index}")
+                continue
+            relative = Path(assertion["path"])
+            try:
+                assertion_path = (root / relative).resolve()
+                assertion_path.relative_to(root.resolve())
+                if relative.is_absolute() or '..' in relative.parts or '\\' in assertion['path']:
+                    raise ValueError('not a repository-relative path')
+            except (ValueError, OSError, RuntimeError):
+                errors.append(f"toolkit-contract.json: unsafe assertion path at index {index}")
+                continue
             if not assertion_path.is_file():
                 errors.append(f"toolkit-contract.json: usage assertion path missing at index {index}: {assertion['path']}")
                 continue
             try:
                 text = assertion_path.read_text(encoding="utf-8")
-            except OSError as exc:
+            except (OSError, UnicodeError) as exc:
                 errors.append(f"toolkit-contract.json: could not read usage assertion path {assertion['path']}: {exc}")
                 continue
             if assertion["contains"] not in text:

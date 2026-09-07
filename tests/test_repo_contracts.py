@@ -61,6 +61,29 @@ class RepositoryContractTests(unittest.TestCase):
         errors = validate_toolkit(mutated, ROOT)
         self.assertTrue(any("usage assertion mismatch" in error for error in errors), errors)
 
+    def test_toolkit_rejects_malformed_ids_and_assertions_without_crashing(self):
+        original = json.loads((ROOT / "toolkit-contract.json").read_text())
+        for bad in [None, [], {}, 123, ""]:
+            with self.subTest(bad=bad):
+                mutated = copy.deepcopy(original)
+                mutated["tools"][0]["id"] = bad
+                self.assertTrue(validate_toolkit(mutated, ROOT))
+                mutated = copy.deepcopy(original)
+                mutated["usage_assertions"][0]["path"] = bad
+                self.assertTrue(validate_toolkit(mutated, ROOT))
+
+    def test_usage_assertions_cannot_read_outside_the_repository(self):
+        original = json.loads((ROOT / "toolkit-contract.json").read_text())
+        for path in ["../README.md", str(ROOT / "README.md"), "../elementorjson/README.md", "..\\README.md"]:
+            mutated = copy.deepcopy(original)
+            mutated["usage_assertions"][0]["path"] = path
+            self.assertTrue(any("unsafe assertion path" in e for e in validate_toolkit(mutated, ROOT)))
+
+    def test_unknown_assertion_tool_is_not_evidence(self):
+        mutated = json.loads((ROOT / "toolkit-contract.json").read_text())
+        mutated["usage_assertions"].append({"tool": "unregistered", "path": "README.md", "contains": "Elementor"})
+        self.assertTrue(any("unknown assertion tool" in e for e in validate_toolkit(mutated, ROOT)))
+
     def test_visual_target_schema_keeps_prediction_boundary(self):
         self.assertEqual(validate_visual_target_schema(ROOT), [])
         schema = json.loads((ROOT / "contracts" / "visual-target.schema.json").read_text(encoding="utf-8"))

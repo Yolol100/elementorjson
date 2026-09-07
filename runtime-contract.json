@@ -54,10 +54,10 @@
     "before_run": [
       "read runtime-contract.json from main and verify repository, branch, workflows and evidence role",
       "classify editor family, dependency mode, target objects and risk with the Elementor skill",
-      "sanitize public-repository inputs and keep secrets outside committed files",
+      "verify current repository visibility; sanitize all inputs and keep secrets outside committed files",
       "write or update the canonical test JSON under templates/",
       "build a visual-target artifact from the complete JSON before section-level repair; attach a matching safe design-intent sidecar when available",
-      "optionally provide target/inventory.json only when it is sanitized and safe for this public repository",
+      "optionally provide target/inventory.json only when it is sanitized and safe under the verified repository and project privacy policy",
       "for native V4 package evidence, activate the exact required Elementor experiments before Elementor boot so customization import/export runners register in that runtime"
     ],
     "run": [
@@ -82,10 +82,10 @@
   },
   "inputs": {
     "templates": "templates/*.json",
-    "design_intent": "sidecars/<template>.design-intent.json (optional and only when safe for this public repository)",
+    "design_intent": "sidecars/<template>.design-intent.json (optional and only when safe under the verified repository and project privacy policy)",
     "target_inventory": "target/inventory.json (optional and only when sanitized for a public repository; confidential inventories require a private controlled runtime)",
     "elementor_pro_secret": "ELEMENTOR_PRO_LICENSE_KEY (optional GitHub Actions secret; never commit the value)",
-    "reference_visual": "kept outside this public repository when confidential; used by the calling assistant for comparison",
+    "reference_visual": "kept outside committed source when confidential; used by the calling assistant for comparison",
     "native_kit_scope": "exact runtime include keys for the Elementor import-export-customization component; defaults must never be treated as target-site capability proof"
   },
   "baseline": {
@@ -173,7 +173,7 @@
     "formal_final_gate": "After the last implementation change, require two stable green final rounds for the covered controlled-runtime scope before handoff to staging/QA."
   },
   "privacy": {
-    "repository_visibility_assumption": "public",
+    "repository_visibility_assumption": "verify-current-metadata",
     "rule": "Do not commit confidential client JSON, private screenshots, credentials, license keys, personal data, secret URLs or confidential target inventories. Use a private runtime/repository or sanitized fixtures instead.",
     "secret_handling": "ELEMENTOR_PRO_LICENSE_KEY must exist only as a GitHub Actions secret and must never be logged or committed."
   },
