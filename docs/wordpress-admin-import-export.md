@@ -4,12 +4,16 @@
 
 The canonical admin behavior is:
 
-- Pages and Posts built with Elementor show a row action **Export Elementor JSON**.
+- Pages and Posts built with Elementor show **Export Elementor JSON**.
+- When Elementor Pro Theme Builder is available, Pages and Posts also expose **Export Elementor + Site Parts**. The connector bundle can contain the source document plus the matching header/footer and source metadata.
 - Saved Templates keep Elementor's native export action; WordPress Connector supplies a fallback only when the native action is absent.
-- Pages, Posts and Saved Templates show **Import Elementor JSON** for users who can edit the target item.
-- Import replaces only the target Elementor document structure/page settings and forces Elementor edit mode; it does not replace unrelated WordPress post fields.
-- Import uses the WordPress Connector `ElementorAdapter` document-save/readback/rollback path rather than direct `_elementor_data` writes.
-- Accepted portable document fields are `content`, `page_settings` (or legacy `settings`), `version`, `title`, and `type`.
-- The uploaded JSON is limited to 5 MB and must contain a non-empty `content` array.
+- Pages, Posts and Saved Templates expose **Import Elementor JSON**.
+- Import can replace the Elementor structure/page settings of an explicitly selected existing item or create a new draft from the uploaded JSON.
+- Import does not replace unrelated WordPress post fields and uses the WordPress Connector `ElementorAdapter` create/save/readback/rollback paths rather than direct `_elementor_data` writes.
+- Accepted portable document fields include `content`, `page_settings` (or legacy `settings`), `version`, `title`, `type`, `global_classes` and `global_variables`.
+- The connector site-parts bundle uses `wordpressconnector/elementor-site-parts-bundle`; Page/Post import consumes its `document` payload and does not silently overwrite Theme Builder assignments.
+- Uploaded JSON is limited to 5 MB and must contain a non-empty `content` array.
 
-This repository may validate the JSON contract and disposable import/roundtrip behavior, but must not become a second live WordPress deployment bridge.
+`wordpressconnector` also supports deterministic `expected_fingerprint` and site-scoped HMAC `expected_state_token` guards for REST mutations. Those transport/runtime guards belong to WordPress Connector, not to this QA repository.
+
+This repository may validate the JSON contract and disposable import/roundtrip/render behavior, but must not become a second live WordPress deployment bridge.
