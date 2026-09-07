@@ -7,7 +7,7 @@ The canonical admin behavior is:
 - Pages and Posts built with Elementor show **Export Elementor JSON** as a per-item row action.
 - Pages, Posts and Saved Templates show **Import Elementor JSON** as a per-item row action; Pages, Posts and Saved Templates also expose an import screen for create-new or replace-existing flows.
 - The WordPress bulk-action dropdown exposes **Export Elementor JSON (ZIP)** for Pages, Posts and Saved Templates. Selected exportable Elementor items are written as separate `.json` files in one ZIP. Non-Elementor or unauthorized selections are skipped and recorded in `manifest.json`.
-- Bulk export is bounded to 100 selected items per request.
+- Bulk export is bounded to 100 selected items and 50 MB of generated JSON per request. Over-limit requests fail before a partial ZIP is downloaded.
 - When Elementor Pro Theme Builder is available, Pages and Posts also expose **Export Elementor + Site Parts**. The connector bundle can contain the source document plus the matching header/footer and source metadata.
 - Saved Templates keep Elementor's native export action; WordPress Connector supplies a fallback only when the native action is absent.
 - Import can replace the Elementor structure/page settings of an explicitly selected existing item or create a new draft from the uploaded JSON.
