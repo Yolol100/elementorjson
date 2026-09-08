@@ -1,0 +1,67 @@
+name: WordPress Playground Smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/playground-smoke.yml'
+      - 'tests/fixtures/playground-smoke.blueprint.json'
+      - 'toolkit-contract.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/playground-smoke.yml'
+      - 'tests/fixtures/playground-smoke.blueprint.json'
+      - 'toolkit-contract.json'
+
+permissions:
+  contents: read
+
+jobs:
+  playground-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Start pinned WordPress Playground baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/playground
+          npx --yes @wp-playground/cli@3.1.53 \
+            --blueprint=tests/fixtures/playground-smoke.blueprint.json \
+            server --port=9400 > artifacts/playground/server.log 2>&1 &
+          echo $! > artifacts/playground/server.pid
+          ready=0
+          for attempt in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:9400/ -o artifacts/playground/homepage.html; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$ready" != "1" ]]; then
+            cat artifacts/playground/server.log
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:9400/wp-json/ -o artifacts/playground/rest-index.json
+          printf 'playground_cli=3.1.53\nwordpress=7.1\nphp=8.3\nstatus=ready\n' > artifacts/playground/runtime.txt
+      - name: Stop Playground
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f artifacts/playground/server.pid ]]; then
+            kill "$(cat artifacts/playground/server.pid)" 2>/dev/null || true
+          fi
+      - name: Upload Playground evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: elementorjson-playground-${{ github.run_id }}
+          path: artifacts/playground/
+          if-no-files-found: error
+          retention-days: 7
