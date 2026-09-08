@@ -12,6 +12,7 @@ REQUIRED_TOOL_IDS = [
     "visual-target-validator",
     "npm-audit",
     "wp-env",
+    "wordpress-playground-cli",
     "elementor-core",
     "hello-elementor",
     "template-library-import",
@@ -57,7 +58,7 @@ def validate_runtime(value):
     errors = require_keys(
         "runtime-contract.json",
         value,
-        ["contract_version", "repository", "default_branch", "workflow", "role", "caller", "trigger", "activation", "evidence"],
+        ["contract_version", "repository", "default_branch", "workflow", "workflows", "role", "caller", "trigger", "activation", "outputs", "evidence"],
     )
     if value.get("repository") != "Yolol100/elementorjson":
         errors.append("runtime-contract.json: repository must be Yolol100/elementorjson")
@@ -67,6 +68,10 @@ def validate_runtime(value):
         errors.append("runtime-contract.json: workflow must point to validate.yml")
     if value.get("role") != "controlled_runtime":
         errors.append("runtime-contract.json: role must remain controlled_runtime")
+
+    workflows = value.get("workflows") if isinstance(value.get("workflows"), dict) else {}
+    if workflows.get("playground_smoke") != ".github/workflows/playground-smoke.yml":
+        errors.append("runtime-contract.json: workflows.playground_smoke must point to playground-smoke.yml")
 
     caller = value.get("caller") if isinstance(value.get("caller"), dict) else {}
     if caller.get("project") != "project-elementor" or caller.get("domain_owner") != "elementor":
@@ -79,8 +84,19 @@ def validate_runtime(value):
         errors.append("runtime-contract.json: trigger boundaries must be populated")
 
     activation = value.get("activation") if isinstance(value.get("activation"), dict) else {}
-    if not activation.get("before_run") or not activation.get("readback"):
-        errors.append("runtime-contract.json: activation before_run/readback must be populated")
+    if not activation.get("before_run") or not activation.get("run") or not activation.get("readback"):
+        errors.append("runtime-contract.json: activation before_run/run/readback must be populated")
+    else:
+        run_text = "\n".join(activation.get("run", [])).lower()
+        readback_text = "\n".join(activation.get("readback", [])).lower()
+        if "playground" not in run_text:
+            errors.append("runtime-contract.json: activation.run must include Playground routing")
+        if "playground" not in readback_text:
+            errors.append("runtime-contract.json: activation.readback must include Playground evidence")
+
+    outputs = value.get("outputs") if isinstance(value.get("outputs"), list) else []
+    if not any(isinstance(item, str) and "playground" in item.lower() for item in outputs):
+        errors.append("runtime-contract.json: outputs must include Playground evidence")
 
     evidence = value.get("evidence") if isinstance(value.get("evidence"), dict) else {}
     if evidence.get("level") != "controlled_runtime":
@@ -207,6 +223,15 @@ def validate_workflow_wiring(root: Path):
         toolkit_workflow = toolkit_workflow_path.read_text(encoding="utf-8")
         if "contracts/**" not in toolkit_workflow:
             errors.append("toolkit-contract.yml: contract schema changes must trigger toolkit validation")
+
+    playground_path = root / ".github" / "workflows" / "playground-smoke.yml"
+    if not playground_path.is_file():
+        errors.append("playground-smoke.yml: workflow missing")
+    else:
+        playground = playground_path.read_text(encoding="utf-8")
+        for marker in ["npm ci", "npm audit --audit-level=high", "3.1.49", "artifacts/playground"]:
+            if marker not in playground:
+                errors.append(f"playground-smoke.yml: required wiring missing: {marker}")
     return errors
 
 
