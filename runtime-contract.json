@@ -1,15 +1,16 @@
 {
-  "contract_version": "1.5",
+  "contract_version": "1.6",
   "repository": "Yolol100/elementorjson",
   "default_branch": "main",
   "workflow": ".github/workflows/validate.yml",
   "workflows": {
     "json_qa": ".github/workflows/validate.yml",
     "composition": ".github/workflows/composition-contract.yml",
-    "native_kit_contract": ".github/workflows/native-kit-contract.yml"
+    "native_kit_contract": ".github/workflows/native-kit-contract.yml",
+    "playground_smoke": ".github/workflows/playground-smoke.yml"
   },
   "role": "controlled_runtime",
-  "purpose": "Turn Elementor JSON source evidence into deterministic whole-page visual-target predictions plus reproducible pinned-baseline WordPress/Elementor controlled-runtime evidence with source validation, official Template Library import, semantic importer roundtrip, registered widget inventory, cross-browser responsive rendering, DOM layout snapshots, same-site media identity contracts and native Elementor Website Template/Design System export-import evidence for exact supported runtimes. Optional Elementor Pro is run-resolved unless an explicit version constraint is introduced and is therefore evidenced only for the exact installed version captured in that run's runtime inventory.",
+  "purpose": "Turn Elementor JSON source evidence into deterministic whole-page visual-target predictions plus reproducible pinned-baseline WordPress/Elementor controlled-runtime evidence with source validation, official Template Library import, semantic importer roundtrip, registered widget inventory, cross-browser responsive rendering, DOM layout snapshots, same-site media identity contracts and native Elementor Website Template/Design System export-import evidence for exact supported runtimes. A locked WordPress Playground smoke workflow provides a fast clean WordPress/PHP baseline before deeper wp-env/MySQL Elementor evidence; it is not Elementor import or render proof. Optional Elementor Pro is run-resolved unless an explicit version constraint is introduced and is therefore evidenced only for the exact installed version captured in that run's runtime inventory.",
   "caller": {
     "project": "project-elementor",
     "domain_owner": "elementor",
@@ -28,7 +29,8 @@
       "a V4 Design System, Global Classes/Variables package, mixed V3/V4 Website Template or native package roundtrip is about to be described as exportable or importable"
     ],
     "optional_when": [
-      "the task is a source-only audit or planning task and no runtime, importer, visual or native-package claim is needed"
+      "the task is a source-only audit or planning task and no runtime, importer, visual or native-package claim is needed",
+      "a fast accountless clean WordPress/PHP startup check is useful before deeper Elementor runtime work"
     ],
     "forbidden_when": [
       "input contains secrets, credentials, personal data or client-confidential content while this repository is public",
@@ -44,11 +46,12 @@
     "exercise Elementor's documented Template Library importer instead of treating direct postmeta writes as import proof",
     "detect semantic importer drift while ignoring only volatile Elementor element IDs",
     "prove that WordPress and Elementor can render the importer-produced template data in a disposable environment",
+    "provide a fast locked Playground WordPress/PHP baseline without replacing wp-env/MySQL Elementor evidence",
     "produce Chromium, Firefox and WebKit evidence at desktop, tablet, mobile and active breakpoint boundaries",
     "capture computed DOM geometry/layout metadata next to screenshots so visual review can check alignment, dimensions, gaps, overflow and responsive behavior against the source prediction",
     "exercise Elementor's own import-export-customization component and its registered native runners when exact-runtime V4 Classes/Variables or mixed package evidence is required, instead of inventing ZIP internals",
     "prove same-site Image, Background and Basic Gallery attachment id+url readback separately from portable import media migration",
-    "separate source-prediction, controlled-runtime and target evidence"
+    "separate source-prediction, clean WordPress baseline, controlled Elementor runtime and target evidence"
   ],
   "activation": {
     "before_run": [
@@ -61,12 +64,14 @@
       "for native V4 package evidence, activate the exact required Elementor experiments before Elementor boot so customization import/export runners register in that runtime"
     ],
     "run": [
+      "let the WordPress Playground Smoke workflow run the exact CLI already present in the committed npm lockfile, audit dependencies and verify a clean WordPress 7.1/PHP 8.3 homepage plus REST index when that baseline is in scope",
       "let the Page Composition Contract workflow build source-prediction visual targets and composition reports",
-      "let the Elementor JSON QA workflow start from the main change or workflow_dispatch",
+      "let the Elementor JSON QA workflow start from the main change or workflow_dispatch for deeper wp-env/MySQL Elementor validation",
       "when native Website Template/Design System evidence is in scope, let the Native Elementor Kit Contract workflow exercise the documented V3 CLI route plus Elementor's import-export-customization component for V4/mixed packages",
       "resolve the resulting workflow runs and require the relevant jobs to complete successfully"
     ],
     "readback": [
+      "when Playground is in scope, read the elementorjson-playground artifact and verify runtime.txt, homepage.html and rest-index.json before calling the clean WordPress/PHP baseline ready",
       "read visual-targets and composition-audit artifacts and confirm visual-target evidence_class=source_prediction and render_observed=false",
       "read static-audit and elementor-runtime-qa artifacts",
       "check dependency audit, runtime inventory, source/runtime/deep audits, importer roundtrip reports, render manifests and Elementor Pro status",
@@ -75,9 +80,10 @@
       "record open target, editor reopen/save/re-export, accessibility and staging tests separately"
     ],
     "iterate": [
+      "on a confirmed Playground startup/dependency defect, repair only the locked baseline workflow or fixture and rerun it without upgrading the deeper Elementor claim",
       "on a confirmed source, dependency, importer, roundtrip, native-package or render defect, repair the canonical source/capability and rerun the same evidence layer",
       "on a visual mismatch, compare the whole-page visual-target prediction plus screenshot/layout snapshot, repair the smallest confirmed section cause, rebuild the whole-page target and rerun",
-      "never convert source-prediction or controlled-runtime success into target_verified or production_observed without later evidence"
+      "never convert source-prediction, Playground baseline or controlled-runtime success into target_verified or production_observed without later evidence"
     ]
   },
   "inputs": {
@@ -86,7 +92,8 @@
     "target_inventory": "target/inventory.json (optional and only when sanitized for a public repository; confidential inventories require a private controlled runtime)",
     "elementor_pro_secret": "ELEMENTOR_PRO_LICENSE_KEY (optional GitHub Actions secret; never commit the value)",
     "reference_visual": "kept outside this public repository when confidential; used by the calling assistant for comparison",
-    "native_kit_scope": "exact runtime include keys for the Elementor import-export-customization component; defaults must never be treated as target-site capability proof"
+    "native_kit_scope": "exact runtime include keys for the Elementor import-export-customization component; defaults must never be treated as target-site capability proof",
+    "playground_fixture": "tests/fixtures/playground-smoke.blueprint.json"
   },
   "baseline": {
     "wordpress": "7.1",
@@ -94,15 +101,17 @@
     "elementor_core": "4.2.4",
     "hello_elementor": "3.5.1",
     "node": "22",
-    "dependency_policy": "direct npm versions are exact; npm audit blocks high/critical findings; a committed npm lockfile remains required for a fully immutable npm dependency graph; optional Elementor Pro is resolved from Elementor's official Composer repository per run unless an explicit version constraint is added, and the exact installed Pro version must be taken from runtime-inventory.json for any Pro-specific claim"
+    "playground_cli": "package-lock:3.1.49",
+    "dependency_policy": "direct npm versions are exact; npm audit blocks high/critical findings; a committed npm lockfile remains required for a fully immutable npm dependency graph; the Playground smoke runs only the exact @wp-playground/cli already present in that lockfile and must fail if the locked version drifts; optional Elementor Pro is resolved from Elementor's official Composer repository per run unless an explicit version constraint is added, and the exact installed Pro version must be taken from runtime-inventory.json for any Pro-specific claim"
   },
   "pipeline": [
     "validate this runtime contract and repository contracts",
+    "when a fast clean baseline is useful, run the committed-lockfile WordPress Playground smoke and dependency audit before interpreting its artifact",
     "build and schema-check a whole-page visual-target source prediction with explicit/declared/inferred/unknown provenance labels",
     "run source-level classic/widget auditor and deep Classic/Atomic structural validator",
     "run validator, visual-target and semantic-roundtrip unit tests",
     "audit npm dependencies and fail on high/critical findings",
-    "start pinned disposable WordPress/PHP with wp-env",
+    "start pinned disposable WordPress/PHP with wp-env for deeper Elementor evidence",
     "install pinned Elementor Core and Hello Elementor",
     "optionally install and activate Elementor Pro from Elementor's official Composer repository and use the exact installed version captured in runtime-inventory.json as run-specific provenance",
     "export the registered Elementor widget and control inventory and verify pinned runtime versions",
@@ -116,10 +125,11 @@
     "when native package evidence is in scope, keep wp elementor kit export as the documented legacy V3 CLI contract and use the generic EJL native_kit_export/native_kit_import bridge to Elementor's current import-export-customization component for registered V4/mixed runners",
     "for V4 package evidence, verify exact feature states, Global Class and Variable export contents, native import readback and re-export persistence",
     "for media identity evidence, create live disposable WordPress attachments and prove same-site Image, Background and Basic Gallery id+url readback while treating portable import ID remapping as a separate migration behavior",
-    "upload audit reports, visual targets, importer outputs, runtime inventory, render manifests, Pro status, native-kit reports/ZIPs and screenshots/layout metadata as workflow artifacts",
+    "upload Playground evidence, audit reports, visual targets, importer outputs, runtime inventory, render manifests, Pro status, native-kit reports/ZIPs and screenshots/layout metadata as workflow artifacts",
     "deactivate the temporary Pro license when used and destroy the runtime"
   ],
   "outputs": [
+    "elementorjson-playground/runtime.txt, homepage.html, rest-index.json and server.log",
     "composition-audit",
     "visual-targets",
     "static-audit",
@@ -140,9 +150,10 @@
     "level": "controlled_runtime",
     "source_prediction_level": "source_prediction",
     "can_support": [
+      "successful clean WordPress 7.1/PHP 8.3 Playground startup and REST response for the locked CLI version in that run",
       "deterministic whole-page source prediction with explicit/declared/inferred/unknown provenance and unresolved-field disclosure",
       "Classic and documented Atomic source-structure validation within implemented validator scope",
-      "runtime widget availability in the disposable environment",
+      "runtime widget availability in the disposable wp-env Elementor environment",
       "successful Elementor Template Library importer acceptance",
       "semantic preservation of content and page_settings across importer storage while ignoring only volatile element IDs",
       "successful disposable WordPress/Elementor render of importer-produced JSON",
@@ -153,6 +164,7 @@
       "same-site WordPress attachment id+url preservation for the tested Image, Background and Basic Gallery controls"
     ],
     "does_not_prove": [
+      "a successful Playground baseline proves Elementor installation, importer acceptance, widget availability or rendering; those require the deeper wp-env Elementor workflow",
       "the visual-target source prediction is a screenshot, browser observation or pixel-perfect truth",
       "exact customer staging compatibility",
       "target_verified status",
@@ -168,7 +180,7 @@
     ]
   },
   "iteration": {
-    "on_failure": "Repair only confirmed JSON, dependency, importer, roundtrip, native-package, render or layout defects; never invent unknown Atomic, Pro, add-on or site-object data; rebuild the whole-page visual target and rerun the same affected evidence layers.",
+    "on_failure": "Repair only confirmed Playground baseline, JSON, dependency, importer, roundtrip, native-package, render or layout defects; never invent unknown Atomic, Pro, add-on or site-object data; rebuild the whole-page visual target and rerun the same affected evidence layers.",
     "on_visual_mismatch": "Compare the current whole-page visual-target prediction with screenshot and layout_snapshot evidence, adjust only the smallest confirmed section/component cause, then rebuild and rerun; keep already-passed scope frozen unless the change can affect it.",
     "formal_final_gate": "After the last implementation change, require two stable green final rounds for the covered controlled-runtime scope before handoff to staging/QA."
   },
