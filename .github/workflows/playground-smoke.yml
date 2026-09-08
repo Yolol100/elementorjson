@@ -6,12 +6,20 @@ on:
       - '.github/workflows/playground-smoke.yml'
       - 'tests/fixtures/playground-smoke.blueprint.json'
       - 'toolkit-contract.json'
+      - 'runtime-contract.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tools/validate_repo_contracts.py'
   push:
     branches: [main]
     paths:
       - '.github/workflows/playground-smoke.yml'
       - 'tests/fixtures/playground-smoke.blueprint.json'
       - 'toolkit-contract.json'
+      - 'runtime-contract.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tools/validate_repo_contracts.py'
 
 permissions:
   contents: read
@@ -26,15 +34,26 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '24'
-      - name: Start pinned WordPress Playground baseline
+          node-version: '22'
+          cache: npm
+      - name: Install committed dependency graph
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Enforce dependency policy
+        run: npm audit --audit-level=high
+      - name: Verify locked Playground CLI
+        shell: bash
+        run: |
+          node -e "const p=require('./package-lock.json'); const v=p.packages['node_modules/@wp-playground/cli']?.version; if(v!=='3.1.49') throw new Error('Expected locked @wp-playground/cli 3.1.49, got '+v);"
+          test -x ./node_modules/.bin/wp-playground-cli
+      - name: Start locked WordPress Playground baseline
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts/playground
-          npx --yes @wp-playground/cli@3.1.53 \
+          ./node_modules/.bin/wp-playground-cli \
+            server \
             --blueprint=tests/fixtures/playground-smoke.blueprint.json \
-            server --port=9400 > artifacts/playground/server.log 2>&1 &
+            --port=9400 > artifacts/playground/server.log 2>&1 &
           echo $! > artifacts/playground/server.pid
           ready=0
           for attempt in $(seq 1 45); do
@@ -49,7 +68,7 @@ jobs:
             exit 1
           fi
           curl -fsS http://127.0.0.1:9400/wp-json/ -o artifacts/playground/rest-index.json
-          printf 'playground_cli=3.1.53\nwordpress=7.1\nphp=8.3\nstatus=ready\n' > artifacts/playground/runtime.txt
+          printf 'playground_cli=3.1.49\nwordpress=7.1\nphp=8.3\nstatus=ready\n' > artifacts/playground/runtime.txt
       - name: Stop Playground
         if: always()
         shell: bash
