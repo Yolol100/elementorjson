@@ -42,7 +42,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ELEMENTOR_CORE_VERSION: '4.2.4'
+  ELEMENTOR_CORE_VERSION: '4.3.1'
   HELLO_ELEMENTOR_VERSION: '3.5.1'
 
 jobs:
@@ -77,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION"
-          # Elementor 4.2.4 registers the Atomic/Classes/Variables customization runners during boot.
+          # Elementor 4.3.1 registers the Atomic/Classes/Variables customization runners during boot.
           npx wp-env run cli wp option update elementor_experiment-e_atomic_elements active
           npx wp-env run cli wp option update elementor_experiment-e_classes active
           npx wp-env run cli wp option update elementor_experiment-e_variables active
@@ -202,15 +202,15 @@ jobs:
           files = {name: {'sha256': hashlib.sha256((root/name).read_bytes()).hexdigest(), 'bytes': (root/name).stat().st_size} for name in names}
           summary = {
               'evidence_class': 'controlled_runtime',
-              'wordpress': '7.1',
-              'elementor': '4.2.4',
+              'wordpress': '7.1.2',
+              'elementor': '4.3.1',
               'documented_wp_cli_v3_export': 'pass',
               'customization_v4_classes_variables_export': 'pass',
               'customization_mixed_export': 'pass',
               'same_site_media_id_url_readback': 'pass',
               'customization_mixed_import_readback': 'pass',
               'customization_reexport_contains_v4_fixtures': 'pass',
-              'contract_note': 'Elementor 4.2.4 wp elementor kit export uses the legacy import-export process; V4 Classes/Variables are proven here through Elementor own import-export-customization component and registered native runners.',
+              'contract_note': 'Elementor 4.3.1 wp elementor kit export uses the legacy import-export process; V4 Classes/Variables are proven here through Elementor own import-export-customization component and registered native runners.',
               'portable_media_note': 'Portable Elementor imports may migrate media and therefore may assign new attachment ids; same-site target reuse must preserve and live-validate existing id+url.',
               'files': files,
               'limitations': ['Disposable controlled runtime, not customer staging.']}
