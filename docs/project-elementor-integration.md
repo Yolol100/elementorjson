@@ -29,8 +29,8 @@ The core workflows must:
 4. audit optional design/content sidecars;
 5. run all regression tests;
 6. use the committed npm lockfile and block high/critical npm findings;
-7. start the pinned WordPress 7.1 / PHP 8.3 runtime;
-8. install Elementor Core 4.2.4 and Hello Elementor 3.5.1;
+7. start the pinned WordPress 7.1.2 / PHP 8.3 runtime;
+8. install Elementor Core 4.3.1 and Hello Elementor 3.5.1;
 9. optionally install Pro from Elementor's official Composer repository;
 10. export and verify actual runtime widget/control inventory;
 11. audit source JSON against runtime and optional safe target inventory;
@@ -45,7 +45,7 @@ The core workflows must:
 
 When the requested claim concerns a native V4 Design System, Global Classes/Variables or a mixed V3/V4 Website Template, use `.github/workflows/native-kit-contract.yml` in addition to the core QA chain.
 
-- Keep the documented `wp elementor kit export` route as a separate V3 CLI contract. In Elementor Core 4.2.4 that command runs the legacy import/export process and must not by itself be promoted to V4 Classes/Variables evidence.
+- Keep the documented `wp elementor kit export` route as a separate V3 CLI contract. In Elementor Core 4.3.1 that command runs the legacy import/export process and must not by itself be promoted to V4 Classes/Variables evidence.
 - For V4/mixed package evidence, activate the required exact-version feature flags before Elementor boot, then call the runtime's own `import-export-customization` component through the generic `ejl native_kit_export` / `ejl native_kit_import` bridge. The bridge does not invent package internals; it lets Elementor register and execute its own native runners.
 - Fail closed when the exact runtime does not expose the customization component or when required V4 features are inactive.
 - Prove the package by inspecting the generated ZIP, confirming Global Classes/Variables files and values, resetting the disposable design-system state, importing through the same native customization process, checking repository readback, and re-exporting once more.
