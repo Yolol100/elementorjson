@@ -89,9 +89,9 @@
     "native_kit_scope": "exact runtime include keys for the Elementor import-export-customization component; defaults must never be treated as target-site capability proof"
   },
   "baseline": {
-    "wordpress": "7.1",
+    "wordpress": "7.1.2",
     "php_series": "8.3",
-    "elementor_core": "4.2.4",
+    "elementor_core": "4.3.1",
     "hello_elementor": "3.5.1",
     "node": "22",
     "dependency_policy": "direct npm versions are exact; npm audit blocks high/critical findings; a committed npm lockfile remains required for a fully immutable npm dependency graph; optional Elementor Pro is resolved from Elementor's official Composer repository per run unless an explicit version constraint is added, and the exact installed Pro version must be taken from runtime-inventory.json for any Pro-specific claim"
@@ -148,7 +148,7 @@
       "successful disposable WordPress/Elementor render of importer-produced JSON",
       "Chromium, Firefox and WebKit checks at the configured desktop, tablet, mobile and active breakpoint viewports",
       "observed DOM bounding boxes and computed layout/style metadata for rendered Elementor elements in that disposable runtime",
-      "native Elementor 4.2.4 customization export/import/re-export of Global Classes and Variables when their required features were active at boot",
+      "native Elementor 4.3.1 customization export/import/re-export of Global Classes and Variables when their required features were active at boot",
       "mixed V3/V4 Website Template package behavior in the exact disposable runtime",
       "same-site WordPress attachment id+url preservation for the tested Image, Background and Basic Gallery controls"
     ],
