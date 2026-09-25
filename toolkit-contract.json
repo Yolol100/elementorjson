@@ -14,13 +14,13 @@
     {"id":"visual-target-builder","version":"repo","trigger_when":"Elementor JSON is supplied and a whole-page visual model is needed","outputs":["artifacts/visual-targets"]},
     {"id":"visual-target-validator","version":"repo","trigger_when":"a visual-target artifact is generated","outputs":["fail-closed source-prediction contract result"]},
     {"id":"npm-audit","version":"runner-node","trigger_when":"every runtime preview","outputs":["artifacts/dependency-audit/npm-audit.json"]},
-    {"id":"wp-env","version":"11.11.0","trigger_when":"runtime evidence is required","outputs":["controlled WordPress runtime"]},
+    {"id":"wp-env","version":"11.15.0","trigger_when":"runtime evidence is required","outputs":["controlled WordPress runtime"]},
     {"id":"elementor-core","version":"4.3.1","trigger_when":"runtime evidence is required","outputs":["runtime inventory and imports"]},
     {"id":"hello-elementor","version":"3.5.1","trigger_when":"runtime evidence is required","outputs":["controlled render baseline"]},
     {"id":"template-library-import","version":"elementor-cli","trigger_when":"templates are supplied to runtime","outputs":["official import evidence"]},
     {"id":"semantic-roundtrip","version":"repo","trigger_when":"templates are imported","outputs":["artifacts/roundtrip"]},
     {"id":"native-kit-customization-bridge","version":"repo","trigger_when":"exact-runtime native V4 Classes/Variables or mixed Website Template export/import evidence is required","outputs":["native Elementor Website Template ZIPs","native customization export/import reports","same-site media identity evidence"]},
-    {"id":"playwright","version":"1.61.1","trigger_when":"rendered runtime evidence is required","outputs":["cross-browser responsive screenshots","DOM layout snapshots"]}
+    {"id":"playwright","version":"1.63.0","trigger_when":"rendered runtime evidence is required","outputs":["cross-browser responsive screenshots","DOM layout snapshots"]}
   ],
   "usage_assertions": [
     {"tool":"elementor-json-auditor","path":".github/workflows/validate.yml","contains":"audit_elementor_json.py"},
@@ -29,7 +29,7 @@
     {"tool":"visual-target-builder","path":".github/workflows/composition-contract.yml","contains":"build_visual_target.py"},
     {"tool":"visual-target-validator","path":".github/workflows/composition-contract.yml","contains":"validate_visual_target.py"},
     {"tool":"npm-audit","path":".github/workflows/validate.yml","contains":"npm audit --audit-level=high"},
-    {"tool":"wp-env","path":"package.json","contains":"\"@wordpress/env\": \"11.11.0\""},
+    {"tool":"wp-env","path":"package.json","contains":"\"@wordpress/env\": \"11.15.0\""},
     {"tool":"wp-env","path":".wp-env.json","contains":"WordPress/WordPress#7.1.2"},
     {"tool":"wp-env","path":".wp-env.json","contains":"\"phpVersion\": \"8.3\""},
     {"tool":"elementor-core","path":".github/workflows/validate.yml","contains":"ELEMENTOR_CORE_VERSION: '4.3.1'"},
@@ -39,7 +39,7 @@
     {"tool":"native-kit-customization-bridge","path":"wordpress-plugin/elementor-json-lab/includes/class-cli-command.php","contains":"get_component( 'import-export-customization' )"},
     {"tool":"native-kit-customization-bridge","path":".github/workflows/native-kit-contract.yml","contains":"ejl native_kit_export"},
     {"tool":"native-kit-customization-bridge","path":".github/workflows/native-kit-contract.yml","contains":"ejl native_kit_import"},
-    {"tool":"playwright","path":"package.json","contains":"\"@playwright/test\": \"1.61.1\""},
+    {"tool":"playwright","path":"package.json","contains":"\"@playwright/test\": \"1.63.0\""},
     {"tool":"playwright","path":"tests/e2e/preview.spec.js","contains":"layout_snapshot"}
   ],
   "boundaries": [
