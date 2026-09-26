@@ -61,7 +61,7 @@ Do not compare on visual intuition alone when exact DOM geometry exists. Do not 
 
 ## Privacy and target boundaries
 
-The repository is public. Never commit confidential client JSON/screenshots, credentials, personal data, secret URLs or confidential inventories. Sensitive artifacts require a private runtime or exact site route. A green run remains controlled-runtime evidence only; it does not prove customer staging, target IDs/globals/conditions/dynamic values, production behavior, full accessibility or pixel-perfect equality without an approved reference. Native V4 package success also does not prove a different target where Elementor version, feature states or registered runners differ.
+The repository is private, but private storage does not relax the data boundary. Never commit confidential client JSON/screenshots, credentials, personal data, secret URLs or confidential inventories. Sensitive artifacts require an ephemeral target-specific runtime/evidence channel or an exact site route. A green run remains controlled-runtime evidence only; it does not prove customer staging, target IDs/globals/conditions/dynamic values, production behavior, full accessibility or pixel-perfect equality without an approved reference. Native V4 package success also does not prove a different target where Elementor version, feature states or registered runners differ.
 
 ## Final gate
 
