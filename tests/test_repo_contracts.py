@@ -20,6 +20,18 @@ class RepositoryContractTests(unittest.TestCase):
     def test_repository_contracts_match_elementor_runtime_boundaries(self):
         self.assertEqual(validate_repository_contracts(ROOT), [])
 
+    def test_runtime_rejects_public_visibility_regression(self):
+        runtime = json.loads((ROOT / "runtime-contract.json").read_text(encoding="utf-8"))
+        runtime["privacy"]["repository_visibility_assumption"] = "public"
+        errors = validate_runtime(runtime)
+        self.assertTrue(any("repository_visibility_assumption" in error for error in errors), errors)
+
+    def test_runtime_rejects_stale_public_repository_wording(self):
+        runtime = json.loads((ROOT / "runtime-contract.json").read_text(encoding="utf-8"))
+        runtime["inputs"]["reference_visual"] = "kept outside this public repository when confidential"
+        errors = validate_runtime(runtime)
+        self.assertTrue(any("stale public-repository wording" in error for error in errors), errors)
+
     def test_runtime_rejects_missing_negative_evidence_boundaries(self):
         runtime = json.loads((ROOT / "runtime-contract.json").read_text(encoding="utf-8"))
         runtime["evidence"]["does_not_prove"] = []
