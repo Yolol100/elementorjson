@@ -54,10 +54,10 @@
     "before_run": [
       "read runtime-contract.json from main and verify repository, branch, workflows and evidence role",
       "classify editor family, dependency mode, target objects and risk with the Elementor skill",
-      "sanitize public-repository inputs and keep secrets outside committed files",
+      "sanitize all persisted inputs and keep secrets outside committed files",
       "write or update the canonical test JSON under templates/",
       "build a visual-target artifact from the complete JSON before section-level repair; attach a matching safe design-intent sidecar when available",
-      "optionally provide target/inventory.json only when it is sanitized and safe for this public repository",
+      "optionally provide target/inventory.json only when it is sanitized and safe to persist in this generic private runtime repository",
       "for native V4 package evidence, activate the exact required Elementor experiments before Elementor boot so customization import/export runners register in that runtime"
     ],
     "run": [
@@ -85,7 +85,7 @@
     "design_intent": "sidecars/<template>.design-intent.json (optional and only when sanitized and safe to persist in the generic runtime repository)",
     "target_inventory": "target/inventory.json (optional and only when sanitized; confidential target inventories remain outside the generic repository and require an ephemeral target-specific evidence channel)",
     "elementor_pro_secret": "ELEMENTOR_PRO_LICENSE_KEY (optional GitHub Actions secret; never commit the value)",
-    "reference_visual": "kept outside this public repository when confidential; used by the calling assistant for comparison",
+    "reference_visual": "kept outside this generic repository when confidential; used by the calling assistant for comparison",
     "native_kit_scope": "exact runtime include keys for the Elementor import-export-customization component; defaults must never be treated as target-site capability proof"
   },
   "baseline": {
