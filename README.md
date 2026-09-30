@@ -4,6 +4,19 @@
 
 Elementor JSON Lab levert reproduceerbaar bewijs voor Elementor JSON. De `elementor` Skill blijft eigenaar van structuur, ontwerpbeslissingen en compatibiliteitsinterpretatie; `webactueel-workflow` blijft de controller. Deze repository is geen productie-deployer en geen live WordPress-bridge.
 
+**Developer profile:** [Andrew Baeten](https://github.com/Yolol100) · [Portfolio cases](https://andrewbaeten.nl/category/cases)
+
+## What it demonstrates
+
+| Area | Implementation |
+| --- | --- |
+| Elementor JSON | Classic/V3, V4/Atomic and mixed structure validation |
+| Runtime QA | Disposable WordPress/Elementor import and semantic round-trip checks |
+| Responsive rendering | Desktop, tablet, mobile and breakpoint screenshots plus DOM metadata |
+| Evidence | Run-scoped artifacts, provenance and explicit proof boundaries |
+| Compatibility | Widget/control inventory, dependency checks and optional Pro detection |
+| Safety | No production deployment, no guessed IDs and no permanent project truth on `main` |
+
 ## Eén taak
 
 ```text
