@@ -26,7 +26,10 @@
               "value": "Elementor JSON Lab Atomic"
             }
           },
-          "elements": []
+          "elements": [],
+          "editor_settings": [],
+          "interactions": [],
+          "styles": []
         },
         {
           "id": "atom0003",
@@ -40,9 +43,16 @@
               "value": "Atomic controlled-runtime preview."
             }
           },
-          "elements": []
+          "elements": [],
+          "editor_settings": [],
+          "interactions": [],
+          "styles": []
         }
-      ]
+      ],
+      "settings": [],
+      "editor_settings": [],
+      "interactions": [],
+      "styles": []
     }
   ]
 }
