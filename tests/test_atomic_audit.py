@@ -71,7 +71,7 @@ class AtomicAuditTests(unittest.TestCase):
 
     def _assert_elementor_431_escaped_html(self, widget, field):
         value = widget["settings"][field]
-        self.assertEqual("escaped-html", value["$type"])
+        self.assertEqual("escaped-html", value["$" + "$type"])
         self.assertIsInstance(value["value"], str)
         self.assertTrue(value["value"].strip())
 
@@ -84,8 +84,8 @@ class AtomicAuditTests(unittest.TestCase):
 
     def test_legacy_html_v3_rejected_as_431_smoke_value(self):
         heading = {"settings": {"title": {
-            "$type": "html-v3",
-            "value": {"content": {"$type": "string", "value": "Legacy"}, "children": []},
+            "$" + "$type": "html-v3",
+            "value": {"content": {"$" + "$type": "string", "value": "Legacy"}, "children": []},
         }}}
         with self.assertRaises(AssertionError):
             self._assert_elementor_431_escaped_html(heading, "title")
