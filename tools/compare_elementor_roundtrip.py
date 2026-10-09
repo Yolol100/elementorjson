@@ -12,6 +12,20 @@ from typing import Any, Dict, List
 # empty control defaults that are not semantically different from an omitted
 # control. Keep this list deliberately narrow: unknown keys and every non-empty
 # value remain strict roundtrip differences.
+ATOMIC_LAYOUT_TYPES = {"e-div-block", "e-flexbox", "e-grid"}
+# The strict source validator requires these fields, but the official
+# Elementor 4.3.1 Template Library import/export omits them if empty.
+# Ignore only these no-op empty containers on actual Atomic elements;
+# changed values, unknown keys and all Classic elements remain strict.
+ATOMIC_EMPTY_STRUCTURAL_KEYS = {"settings", "editor_settings", "interactions", "styles"}
+
+
+def is_empty_atomic_field(key: str, value: Any) -> bool:
+    if key not in ATOMIC_EMPTY_STRUCTURAL_KEYS:
+        return False
+    return value == [] or (key != "interactions" and value == {})
+
+
 EMPTY_IMPORTER_DEFAULT_SETTING_KEYS = {
     "_background_image",
     "_background_slideshow_gallery",
@@ -67,7 +81,17 @@ def normalize(value: Any) -> Any:
     if isinstance(value, dict):
         result = {}
         is_element = isinstance(value.get("elType"), str)
+        is_atomic = is_element and (
+            value["elType"] in ATOMIC_LAYOUT_TYPES
+            or (
+                value["elType"] == "widget"
+                and isinstance(value.get("widgetType"), str)
+                and value["widgetType"].startswith("e-")
+            )
+        )
         for key, child in value.items():
+            if is_atomic and is_empty_atomic_field(key, child):
+                continue
             if is_element and key == "id":
                 result[key] = "<volatile-element-id>"
             elif is_element and key == "settings":
@@ -141,6 +165,7 @@ def compare(source: Dict[str, Any], imported: Dict[str, Any]) -> Dict[str, Any]:
         "status": "pass" if not differences else "fail",
         "normalization": (
             "Element IDs are volatile; on actual Elementor element objects only, a missing isInner is normalized to false. "
+            "On Atomic elements only, the four known empty source structural fields may be omitted after import. "
             "Only explicitly whitelisted empty Template Library control defaults are ignored; non-empty and unknown controls remain strict."
         ),
         "semantic_fingerprints": {
