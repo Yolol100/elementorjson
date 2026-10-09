@@ -4,6 +4,8 @@
   "private": true,
   "description": "Elementor JSON validation, official-import roundtrip and cross-browser preview pipeline",
   "scripts": {
+    "postinstall": "node tools/patch_wp_env_simple_git.cjs",
+    "test:wp-env-git-compat": "node tools/patch_wp_env_simple_git.cjs --self-test",
     "wp:start": "wp-env start",
     "wp:stop": "wp-env stop",
     "test:contracts": "python tools/validate_repo_contracts.py",
