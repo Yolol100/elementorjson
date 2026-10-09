@@ -52,6 +52,7 @@ function main() {
     return;
   }
   if (process.argv.length !== 2) throw new Error('Unexpected arguments');
+  selfTest();
   const root = path.resolve(__dirname, '..');
   const modulesRoot = path.join(root, 'node_modules');
   const installedVersion = (pkg) =>
