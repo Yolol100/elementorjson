@@ -57,7 +57,7 @@ def validate_runtime(value):
     errors = require_keys(
         "runtime-contract.json",
         value,
-        ["contract_version", "repository", "default_branch", "workflow", "role", "caller", "trigger", "activation", "evidence"],
+        ["contract_version", "repository", "default_branch", "workflow", "role", "caller", "trigger", "activation", "evidence", "privacy"],
     )
     if value.get("repository") != "Yolol100/elementorjson":
         errors.append("runtime-contract.json: repository must be Yolol100/elementorjson")
@@ -87,6 +87,15 @@ def validate_runtime(value):
         errors.append("runtime-contract.json: evidence.level must remain controlled_runtime")
     if evidence.get("source_prediction_level") != "source_prediction":
         errors.append("runtime-contract.json: evidence.source_prediction_level must remain source_prediction")
+
+    privacy = value.get("privacy") if isinstance(value.get("privacy"), dict) else {}
+    if privacy.get("repository_visibility_assumption") != "private":
+        errors.append("runtime-contract.json: privacy.repository_visibility_assumption must remain private")
+    privacy_rule = privacy.get("rule") if isinstance(privacy.get("rule"), str) else ""
+    if "private repository visibility" not in privacy_rule.lower():
+        errors.append("runtime-contract.json: privacy rule must state that private visibility does not waive the data boundary")
+    if "public repository" in json.dumps(value, ensure_ascii=False).lower():
+        errors.append("runtime-contract.json: stale public-repository wording is not allowed for the private runtime")
     does_not_prove = evidence.get("does_not_prove")
     if not isinstance(does_not_prove, list) or not does_not_prove or not all(isinstance(item, str) and item.strip() for item in does_not_prove):
         errors.append("runtime-contract.json: evidence.does_not_prove must remain a non-empty list of explicit limitations")
@@ -242,6 +251,15 @@ def validate_repository_contracts(root=Path(".")):
     if toolkit is not None:
         errors.extend(validate_toolkit(toolkit, root))
     errors.extend(validate_visual_target_schema(root))
+    integration_path = root / "docs" / "project-elementor-integration.md"
+    if not integration_path.is_file():
+        errors.append("project-elementor-integration.md: file missing")
+    else:
+        integration = integration_path.read_text(encoding="utf-8")
+        if "The repository is public." in integration:
+            errors.append("project-elementor-integration.md: stale public repository statement")
+        if "repository is private" not in integration.lower():
+            errors.append("project-elementor-integration.md: private repository boundary must remain explicit")
     errors.extend(validate_workflow_wiring(root))
     return errors
 
