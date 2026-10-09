@@ -60,15 +60,20 @@ function main() {
   if (installedVersion('@wordpress/env') !== '11.17.0' || installedVersion('simple-git') !== '4.0.2') {
     throw new Error('Installed package versions differ from pinned compatibility contract');
   }
-  const file = path.join(modulesRoot, '@wordpress', 'env', 'lib', 'download-sources.js');
-  const actual = fs.realpathSync(file);
-  if (!actual.startsWith(modulesRoot + path.sep)) throw new Error('Unsafe module file path');
-
-  const before = fs.readFileSync(actual, 'utf8');
-  const patched = patchSource(before);
-  if (patched.changed) fs.writeFileSync(actual, patched.source, 'utf8');
-  if (patchSource(fs.readFileSync(actual, 'utf8')).changed) throw new Error('Patch readback failed');
-  console.log('Verified wp-env 11.17.0 compatibility with patched simple-git 4.0.2');
+  const paths = [
+    ['lib', 'download-sources.js'],
+    ['lib', 'runtime', 'docker', 'download-wp-phpunit.js'],
+  ];
+  for (const parts of paths) {
+    const file = path.join(modulesRoot, '@wordpress', 'env', ...parts);
+    const actual = fs.realpathSync(file);
+    if (!actual.startsWith(modulesRoot + path.sep)) throw new Error('Unsafe module file path');
+    const before = fs.readFileSync(actual, 'utf8');
+    const patched = patchSource(before);
+    if (patched.changed) fs.writeFileSync(actual, patched.source, 'utf8');
+    if (patchSource(fs.readFileSync(actual, 'utf8')).changed) throw new Error('Patch readback failed');
+  }
+  console.log('Verified both pinned wp-env 11.17.0 git integrations with simple-git 4.0.2');
 }
 
 module.exports = { patchSource, selfTest };
