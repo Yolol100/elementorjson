@@ -9,10 +9,6 @@
       "version": "0.0",
       "elType": "e-div-block",
       "isInner": false,
-      "settings": [],
-      "editor_settings": [],
-      "interactions": [],
-      "styles": [],
       "elements": [
         {
           "id": "atom0002",
@@ -26,24 +22,14 @@
               "value": "h2"
             },
             "title": {
-              "$$type": "html-v3",
-              "value": {
-                "content": {
-                  "$$type": "string",
-                  "value": "Elementor JSON Lab Atomic"
-                },
-                "children": []
-              }
-            },
-            "link": {
-              "$$type": "link",
-              "value": []
+              "$$type": "escaped-html",
+              "value": "Elementor JSON Lab Atomic"
             }
           },
+          "elements": [],
           "editor_settings": [],
           "interactions": [],
-          "styles": [],
-          "elements": []
+          "styles": []
         },
         {
           "id": "atom0003",
@@ -53,26 +39,20 @@
           "isInner": false,
           "settings": {
             "paragraph": {
-              "$$type": "html-v3",
-              "value": {
-                "content": {
-                  "$$type": "string",
-                  "value": "Atomic controlled-runtime preview."
-                },
-                "children": []
-              }
-            },
-            "link": {
-              "$$type": "link",
-              "value": []
+              "$$type": "escaped-html",
+              "value": "Atomic controlled-runtime preview."
             }
           },
+          "elements": [],
           "editor_settings": [],
           "interactions": [],
-          "styles": [],
-          "elements": []
+          "styles": []
         }
-      ]
+      ],
+      "settings": [],
+      "editor_settings": [],
+      "interactions": [],
+      "styles": []
     }
   ]
 }

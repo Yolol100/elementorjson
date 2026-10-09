@@ -2,8 +2,14 @@
   "name": "elementor-json-lab",
   "version": "0.2.0",
   "private": true,
+  "engines": {
+    "node": ">=24.18.0",
+    "npm": ">=11.16.0"
+  },
   "description": "Elementor JSON validation, official-import roundtrip and cross-browser preview pipeline",
   "scripts": {
+    "postinstall": "node tools/patch_wp_env_simple_git.cjs",
+    "test:wp-env-git-compat": "node tools/patch_wp_env_simple_git.cjs --self-test",
     "wp:start": "wp-env start",
     "wp:stop": "wp-env stop",
     "test:contracts": "python tools/validate_repo_contracts.py",
@@ -13,11 +19,14 @@
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
-    "@wordpress/env": "11.15.0"
+    "@wordpress/env": "11.17.0"
   },
   "overrides": {
-    "adm-zip": "0.6.0",
-    "fast-uri": "3.1.7",
-    "qs": "6.16.0"
+    "adm-zip": "0.6.1",
+    "brace-expansion": "2.1.7",
+    "fast-uri": "3.1.8",
+    "http-cache-semantics": "4.3.0",
+    "qs": "6.16.0",
+    "simple-git": "4.0.2"
   }
 }

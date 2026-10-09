@@ -59,7 +59,7 @@
     },
     {
       "id": "wp-env",
-      "version": "11.15.0",
+      "version": "11.17.0",
       "trigger_when": "runtime evidence is required",
       "outputs": [
         "controlled WordPress runtime"
@@ -151,7 +151,7 @@
     {
       "tool": "wp-env",
       "path": "package.json",
-      "contains": "\"@wordpress/env\": \"11.15.0\""
+      "contains": "\"@wordpress/env\": \"11.17.0\""
     },
     {
       "tool": "wp-env",

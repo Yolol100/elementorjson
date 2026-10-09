@@ -89,6 +89,32 @@ class DeepValidationTests(unittest.TestCase):
         self.assertEqual("fail", report["status"])
         self.assertTrue(any(item["code"] == "atomic_invalid_is_inner" for item in report["errors"]))
 
+    def test_importer_omitted_atomic_structural_defaults_are_allowed(self):
+        imported = copy.deepcopy(ATOMIC_TEMPLATE)
+        for element in [imported["content"][0], *imported["content"][0]["elements"]]:
+            for key in ("editor_settings", "interactions", "styles"):
+                self.assertEqual([], element.pop(key))
+            if element.get("settings") == []:
+                element.pop("settings")
+        self.assertEqual("fail", validate_document(imported)["status"])
+        result = validate_document(imported, allow_importer_defaults=True)
+        self.assertEqual("pass", result["status"], result["errors"])
+
+    def test_importer_mode_does_not_accept_explicit_invalid_structural_types(self):
+        expected_errors = {
+            "settings": "atomic_invalid_settings",
+            "editor_settings": "atomic_invalid_editor_settings",
+            "interactions": "atomic_invalid_interactions",
+            "styles": "atomic_invalid_styles",
+        }
+        for key, code in expected_errors.items():
+            with self.subTest(field=key):
+                imported = copy.deepcopy(ATOMIC_TEMPLATE)
+                imported["content"][0][key] = None
+                report = validate_document(imported, allow_importer_defaults=True)
+                self.assertEqual("fail", report["status"])
+                self.assertIn(code, [item["code"] for item in report["errors"]])
+
     def test_atomic_untyped_setting_fails(self):
         template = copy.deepcopy(ATOMIC_TEMPLATE)
         template["content"][0]["elements"][0]["settings"]["tag"] = "h3"

@@ -69,5 +69,43 @@ class AtomicAuditTests(unittest.TestCase):
         self.assertEqual("elementor-core", report["widgets"][0]["owner"]["owner"])
 
 
+    def _assert_elementor_431_escaped_html(self, widget, field):
+        value = widget["settings"][field]
+        self.assertEqual("escaped-html", value["$$type"])
+        self.assertIsInstance(value["value"], str)
+        self.assertTrue(value["value"].strip())
+
+    def test_smoke_atomic_props_match_elementor_431(self):
+        template = json.loads((ROOT / "templates/smoke-atomic.json").read_text(encoding="utf-8"))
+        widgets = template["content"][0]["elements"]
+        self.assertEqual(["e-heading", "e-paragraph"], [w["widgetType"] for w in widgets])
+        self._assert_elementor_431_escaped_html(widgets[0], "title")
+        self._assert_elementor_431_escaped_html(widgets[1], "paragraph")
+
+    def test_smoke_atomic_source_preserves_required_structural_fields(self):
+        # The source schema requires explicit fields that Elementor may
+        # omit after import when they are empty; only the roundtrip comparator
+        # can treat those no-op omissions as equivalent.
+        template = json.loads((ROOT / "templates/smoke-atomic.json").read_text(encoding="utf-8"))
+        layout = template["content"][0]
+        self.assertEqual([], layout["settings"])
+        for element in [layout, *layout["elements"]]:
+            self.assertIs(element["isInner"], False)
+            self.assertEqual([], element["editor_settings"])
+            self.assertEqual([], element["interactions"])
+            self.assertEqual([], element["styles"])
+            self.assertIn("settings", element)
+        for widget in layout["elements"]:
+            self.assertNotIn("link", widget["settings"])
+
+    def test_legacy_html_v3_rejected_as_431_smoke_value(self):
+        heading = {"settings": {"title": {
+            "$$type": "html-v3",
+            "value": {"content": {"$$type": "string", "value": "Legacy"}, "children": []},
+        }}}
+        with self.assertRaises(AssertionError):
+            self._assert_elementor_431_escaped_html(heading, "title")
+
+
 if __name__ == "__main__":
     unittest.main()
