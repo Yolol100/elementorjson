@@ -39,6 +39,8 @@ jobs:
           node -e "const p=require('./package-lock.json'); if (p.packages['node_modules/adm-zip'].version !== '0.6.1' || p.packages['node_modules/@wordpress/env'].version !== '11.17.0') process.exit(1)"
           npm ci --ignore-scripts --no-audit --no-fund
           git diff --stat -- package-lock.json
+          npm audit --audit-level=high --json > /tmp/ejl-audit.json || true
+          node -e "const a=require('/tmp/ejl-audit.json'); console.log('Audit counts:',JSON.stringify(a.metadata?.vulnerabilities)); console.log('High/critical packages:',JSON.stringify(Object.entries(a.vulnerabilities||{}).filter(([n,v])=>['high','critical'].includes(v.severity)).map(([n,v])=>({name:n,severity:v.severity,range:v.range,fix:v.fixAvailable}))))"
       - name: Commit refreshed lockfile to this feature branch only
         if: github.ref == 'refs/heads/fix/adm-zip-0-6-1-security-20261009'
         shell: bash
