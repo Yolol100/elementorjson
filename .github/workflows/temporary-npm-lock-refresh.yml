@@ -1,0 +1,75 @@
+# Temporary, branch-restricted lockfile regeneration. Remove before merge.
+name: Temporary npm lock refresh
+on:
+  push:
+    branches:
+      - fix/adm-zip-0-6-1-security-20261009
+    paths:
+      - package.json
+      - .github/workflows/temporary-npm-lock-refresh.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-npm-lock-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.repository == 'Yolol100/elementorjson'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Regenerate lockfile without install scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = 'fix/adm-zip-0-6-1-security-20261009'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package.json
+          node -e "const p=require('./package-lock.json'); if (p.packages['node_modules/adm-zip'].version !== '0.6.1' || p.packages['node_modules/@wordpress/env'].version !== '11.17.0') process.exit(1)"
+          npm ci --ignore-scripts --no-audit --no-fund
+          git diff --stat -- package-lock.json
+      - name: Commit refreshed lockfile to this feature branch only
+        if: github.ref == 'refs/heads/fix/adm-zip-0-6-1-security-20261009'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package-lock.json; then
+            echo "The committed package-lock.json is already in sync."
+            exit 0
+          fi
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          repository = os.environ['GITHUB_REPOSITORY']
+          branch = os.environ['GITHUB_REF_NAME']
+          assert repository == 'Yolol100/elementorjson'
+          assert branch == 'fix/adm-zip-0-6-1-security-20261009'
+          meta = json.loads(subprocess.check_output(
+              ['gh', 'api', f'repos/{repository}/contents/package-lock.json?ref={branch}'],
+              text=True
+          ))
+          request = {
+              'message': 'build: regenerate npm lockfile for verified security updates',
+              'content': base64.b64encode(Path('package-lock.json').read_bytes()).decode('ascii'),
+              'sha': meta['sha'],
+              'branch': branch,
+          }
+          Path('/tmp/ejl-lock-request.json').write_text(json.dumps(request))
+          PY
+          gh api "repos/$GITHUB_REPOSITORY/contents/package-lock.json" --method PUT --input /tmp/ejl-lock-request.json --jq '.commit.sha'
