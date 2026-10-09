@@ -87,15 +87,17 @@ def validate_document(document: Any, allow_importer_defaults: bool = False) -> D
 
         editor_settings = element.get("editor_settings")
         if not isinstance(editor_settings, (list, dict)):
-            error(
-                "atomic_invalid_editor_settings",
-                "Atomic editor_settings must be an array or object.",
-                f"{path}.editor_settings",
-            )
+            if not (allow_importer_defaults and "editor_settings" not in element):
+                error(
+                    "atomic_invalid_editor_settings",
+                    "Atomic editor_settings must be an array or object.",
+                    f"{path}.editor_settings",
+                )
 
         interactions = element.get("interactions")
         if not isinstance(interactions, list):
-            error("atomic_invalid_interactions", "Atomic interactions must be an array.", f"{path}.interactions")
+            if not (allow_importer_defaults and "interactions" not in element):
+                error("atomic_invalid_interactions", "Atomic interactions must be an array.", f"{path}.interactions")
 
         settings = element.get("settings")
         if isinstance(settings, list):
@@ -110,11 +112,13 @@ def validate_document(document: Any, allow_importer_defaults: bool = False) -> D
                         f"{path}.settings.{key}",
                     )
         else:
-            error("atomic_invalid_settings", "Atomic settings must be an object or empty array.", f"{path}.settings")
+            if not (allow_importer_defaults and "settings" not in element):
+                error("atomic_invalid_settings", "Atomic settings must be an object or empty array.", f"{path}.settings")
 
         styles = element.get("styles")
         if not isinstance(styles, (list, dict)):
-            error("atomic_invalid_styles", "Atomic styles must be an array or object.", f"{path}.styles")
+            if not (allow_importer_defaults and "styles" not in element):
+                error("atomic_invalid_styles", "Atomic styles must be an array or object.", f"{path}.styles")
             return
 
         for suffix, style in iter_styles(styles):
@@ -236,7 +240,7 @@ def main() -> int:
     parser.add_argument(
         "--allow-importer-defaults",
         action="store_true",
-        help="Allow only proven Elementor Template Library storage defaults, such as omission of isInner=false.",
+        help="Allow proven importer-only omitted Atomic defaults: isInner=false and empty settings, editor_settings, interactions and styles.",
     )
     args = parser.parse_args()
 
