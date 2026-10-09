@@ -16,7 +16,7 @@
     "@wordpress/env": "11.15.0"
   },
   "overrides": {
-    "adm-zip": "0.6.0",
+    "adm-zip": "0.6.1",
     "fast-uri": "3.1.7",
     "qs": "6.16.0"
   }
