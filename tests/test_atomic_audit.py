@@ -82,6 +82,16 @@ class AtomicAuditTests(unittest.TestCase):
         self._assert_elementor_431_escaped_html(widgets[0], "title")
         self._assert_elementor_431_escaped_html(widgets[1], "paragraph")
 
+    def test_smoke_atomic_does_not_claim_nonexistent_optional_roundtrip_fields(self):
+        template = json.loads((ROOT / "templates/smoke-atomic.json").read_text(encoding="utf-8"))
+        container = template["content"][0]
+        for element in [container, *container["elements"]]:
+            for optional in ("settings", "editor_settings", "interactions", "styles"):
+                if optional in element:
+                    self.assertNotEqual([], element[optional], f"{element['id']}: {optional} is a native importer no-op")
+        for widget in container["elements"]:
+            self.assertNotIn("link", widget["settings"])
+
     def test_legacy_html_v3_rejected_as_431_smoke_value(self):
         heading = {"settings": {"title": {
             "$" + "$type": "html-v3",
