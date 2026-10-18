@@ -62,7 +62,7 @@
     ],
     "run": [
       "let the Page Composition Contract workflow build source-prediction visual targets and composition reports",
-      "let the Elementor JSON QA workflow start from the main change or workflow_dispatch",
+      "start the Elementor JSON QA workflow explicitly via workflow_dispatch; do not infer runtime validity from source changes without a successful run",
       "when native Website Template/Design System evidence is in scope, let the Native Elementor Kit Contract workflow exercise the documented V3 CLI route plus Elementor's import-export-customization component for V4/mixed packages",
       "resolve the resulting workflow runs and require the relevant jobs to complete successfully"
     ],
