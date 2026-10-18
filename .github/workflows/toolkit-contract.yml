@@ -1,17 +1,7 @@
 name: Toolkit Contract
 
 on:
-  pull_request:
-  push:
-    branches: [main]
-    paths:
-      - 'toolkit-contract.json'
-      - 'package.json'
-      - 'contracts/**'
-      - 'sidecars/**'
-      - '.github/workflows/**'
-      - 'tools/**'
-      - 'tests/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
