@@ -1,37 +1,6 @@
 name: Native Elementor Kit Contract
 
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/native-kit-contract.yml'
-      - 'wordpress-plugin/elementor-json-lab/includes/class-cli-command.php'
-      - 'wordpress-plugin/elementor-json-lab/tests/runtime/**'
-      - 'templates/smoke-heading.json'
-      - 'templates/smoke-atomic.json'
-      - 'runtime-contract.json'
-      - 'toolkit-contract.json'
-      - 'README.md'
-      - 'docs/project-elementor-integration.md'
-      - 'AGENTS.md'
-      - '.wp-env.json'
-      - 'package.json'
-      - 'package-lock.json'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/native-kit-contract.yml'
-      - 'wordpress-plugin/elementor-json-lab/includes/class-cli-command.php'
-      - 'wordpress-plugin/elementor-json-lab/tests/runtime/**'
-      - 'templates/smoke-heading.json'
-      - 'templates/smoke-atomic.json'
-      - 'runtime-contract.json'
-      - 'toolkit-contract.json'
-      - 'README.md'
-      - 'docs/project-elementor-integration.md'
-      - 'AGENTS.md'
-      - '.wp-env.json'
-      - 'package.json'
-      - 'package-lock.json'
   workflow_dispatch:
 
 permissions:
