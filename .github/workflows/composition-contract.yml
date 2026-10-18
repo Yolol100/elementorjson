@@ -1,39 +1,6 @@
 name: Page Composition Contract
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/composition-contract.yml'
-      - 'contracts/**'
-      - 'docs/proof-polish-and-sidecars.md'
-      - 'sidecars/**'
-      - 'templates/**'
-      - 'tests/test_page_composition.py'
-      - 'tests/test_repo_contracts.py'
-      - 'tests/test_visual_target.py'
-      - 'tests/test_visual_target_contract.py'
-      - 'toolkit-contract.json'
-      - 'tools/audit_page_composition.py'
-      - 'tools/build_visual_target.py'
-      - 'tools/validate_visual_target.py'
-      - 'tools/validate_repo_contracts.py'
-  pull_request:
-    paths:
-      - '.github/workflows/composition-contract.yml'
-      - 'contracts/**'
-      - 'docs/proof-polish-and-sidecars.md'
-      - 'sidecars/**'
-      - 'templates/**'
-      - 'tests/test_page_composition.py'
-      - 'tests/test_repo_contracts.py'
-      - 'tests/test_visual_target.py'
-      - 'tests/test_visual_target_contract.py'
-      - 'toolkit-contract.json'
-      - 'tools/audit_page_composition.py'
-      - 'tools/build_visual_target.py'
-      - 'tools/validate_visual_target.py'
-      - 'tools/validate_repo_contracts.py'
   workflow_dispatch:
 
 permissions:

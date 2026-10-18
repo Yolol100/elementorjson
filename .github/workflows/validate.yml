@@ -1,44 +1,6 @@
 name: Elementor JSON QA
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/dependabot.yml'
-      - '.github/workflows/validate.yml'
-      - '.gitignore'
-      - '.wp-env.json'
-      - 'AGENTS.md'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'playwright.config.js'
-      - 'runtime-contract.json'
-      - 'docs/**'
-      - 'templates/**'
-      - 'target/**'
-      - 'tests/**'
-      - 'tools/**'
-      - 'wordpress-plugin/**'
-      - 'README.md'
-  pull_request:
-    paths:
-      - '.github/dependabot.yml'
-      - '.github/workflows/validate.yml'
-      - '.gitignore'
-      - '.wp-env.json'
-      - 'AGENTS.md'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'playwright.config.js'
-      - 'runtime-contract.json'
-      - 'docs/**'
-      - 'templates/**'
-      - 'target/**'
-      - 'tests/**'
-      - 'tools/**'
-      - 'wordpress-plugin/**'
-      - 'README.md'
   workflow_dispatch:
 
 permissions:

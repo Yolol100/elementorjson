@@ -72,6 +72,8 @@ De repository is private, maar private opslag verlaagt de veiligheidsgrenzen nie
 
 ## Verificatie
 
+**Status GitHub Actions (18 oktober 2026):** automatische `push`- en `pull_request`-tests staan uit zolang GitHub-hosted runners deze private repository vóór de eerste stap blokkeren. De vijf testworkflows blijven via `workflow_dispatch` beschikbaar; de afzonderlijke runtime-requestworkflow blijft intact. Dit is geen geslaagde QA: voor ieder runtime-, staging- of releasebesluit zijn nog steeds daadwerkelijk uitgevoerde en geslaagde tests vereist. Heractiveer de automatische triggers pas wanneer GitHub de runner-/accountblokkade heeft opgelost.
+
 Voor Python-/JSON-logica:
 
 ```bash
