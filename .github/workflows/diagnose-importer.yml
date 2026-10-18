@@ -1,14 +1,7 @@
 name: Diagnose Elementor importer roundtrip
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/diagnose-importer.yml'
-  pull_request:
-    paths:
-      - '.github/workflows/diagnose-importer.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
