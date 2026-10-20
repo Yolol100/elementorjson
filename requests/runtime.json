@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "request_id": "qa-recheck-20261020-8bc09d71",
+  "enabled": true,
+  "owner": "elementor",
+  "project_id": "project-elementor",
+  "for": "Acceptance of the repaired Playwright dependency contract in PR 49",
+  "task": "Run the existing static and isolated WordPress Elementor QA against the exact request head derived from c0ac9490968547d74b15d62ea809a4e4ea469f51",
+  "why": "The earlier contract correction passed source checks but had no matching runtime receipt",
+  "trigger_when": "Owner-authorized continuation of open GitHub and production acceptance checks",
+  "do_not_trigger_when": "Live client writes, payment tests, email actions, production deployment, or unverified result promotion",
+  "requested_by": "webactueel-workflow",
+  "source_context": {
+    "project_id": "project-elementor",
+    "source_set_version": "2026-10-19.1-woocommerce-11.2-checkout-gates"
+  }
+}
