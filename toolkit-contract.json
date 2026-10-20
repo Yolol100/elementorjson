@@ -109,7 +109,7 @@
     },
     {
       "id": "playwright",
-      "version": "1.63.0",
+      "version": "1.64.1",
       "trigger_when": "rendered runtime evidence is required",
       "outputs": [
         "cross-browser responsive screenshots",
@@ -201,7 +201,7 @@
     {
       "tool": "playwright",
       "path": "package.json",
-      "contains": "\"@playwright/test\": \"1.63.0\""
+      "contains": "\"@playwright/test\": \"1.64.1\""
     },
     {
       "tool": "playwright",
