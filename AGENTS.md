@@ -4,7 +4,7 @@ These instructions apply to the entire repository.
 
 ## Role
 
-This private repository is a controlled runtime capability for Project Elementor. It is not the domain owner, workflow controller, live WordPress bridge or production deployment system.
+This public repository is a controlled runtime capability for Project Elementor. It is not the domain owner, workflow controller, live WordPress bridge or production deployment system.
 
 Before changing or running Elementor JSON work:
 
@@ -33,7 +33,7 @@ Do not turn a source-only task into a runtime run. Do not use this repository fo
 
 ## Privacy and repository hygiene
 
-Private storage does not authorize unrestricted client data.
+Public source visibility requires sanitized fixtures only; client data must remain outside this repository.
 
 - Never commit secrets, credentials, private download URLs, license keys or personal data.
 - Keep task-specific JSON, screenshots and inventories temporary and run-scoped unless project policy explicitly permits otherwise.

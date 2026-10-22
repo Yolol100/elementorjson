@@ -2,6 +2,28 @@ name: Page Composition Contract
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - 'sidecars/**'
+      - 'templates/**'
+      - 'tools/**'
+      - 'tests/**'
+      - 'docs/**'
+      - '.github/workflows/composition-contract.yml'
+      - 'README.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - 'sidecars/**'
+      - 'templates/**'
+      - 'tools/**'
+      - 'tests/**'
+      - 'docs/**'
+      - '.github/workflows/composition-contract.yml'
+      - 'README.md'
 
 permissions:
   contents: read

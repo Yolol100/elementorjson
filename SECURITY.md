@@ -2,7 +2,7 @@
 
 ## Supported scope
 
-This private repository is a controlled-runtime and QA harness for Elementor JSON. It is not a production deployment system or live WordPress bridge.
+This public repository is a controlled-runtime and QA harness for Elementor JSON. It is not a production deployment system or live WordPress bridge.
 
 ## Reporting a vulnerability
 
@@ -14,7 +14,13 @@ Use GitHub private vulnerability reporting / Security Advisory flow when availab
 
 ## Fixtures and evidence
 
-Only sanitized, task-appropriate fixtures belong on `main`. Customer JSON, screenshots, inventories and run-scoped evidence must follow the repository hygiene policy and must not become permanent default-branch project truth.
+This public repository and its Git history are visible to anyone. Only sanitized, task-appropriate fixtures belong on `main`. Customer JSON, screenshots, inventories and run-scoped evidence must follow the repository hygiene policy and must not become permanent default-branch project truth.
+
+## Automated security checks and residual dependency risk
+
+GitHub CodeQL scans supported JavaScript/TypeScript, Python and GitHub Actions sources on changes and weekly. CodeQL does not scan this project's PHP source; WordPress runtime and other PHP/security acceptance require separate checks.
+
+Dependabot monitors npm and GitHub Actions updates. As of 22 October 2026, [CVE-2026-97058](https://github.com/advisories/ghsa-hp3w-g68c-fv3c) affects `sprintf-js` via `@wordpress/env -> js-yaml@3 -> argparse@1` and has no upstream patched release. The package is confined to development/test tooling in this project; never pass untrusted user-supplied format strings to it. Keep the alert open until a tested upstream fix or dependency removal is available. Do not suppress the alert as fixed.
 
 ## Evidence boundary
 

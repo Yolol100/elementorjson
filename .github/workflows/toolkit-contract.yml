@@ -2,6 +2,38 @@ name: Toolkit Contract
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - 'sidecars/**'
+      - 'templates/**'
+      - 'toolkit-contract.json'
+      - 'runtime-contract.json'
+      - 'tools/**'
+      - 'tests/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'AGENTS.md'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/toolkit-contract.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - 'sidecars/**'
+      - 'templates/**'
+      - 'toolkit-contract.json'
+      - 'runtime-contract.json'
+      - 'tools/**'
+      - 'tests/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'AGENTS.md'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/toolkit-contract.yml'
 
 permissions:
   contents: read
