@@ -26,10 +26,9 @@ REQUIRED_NEGATIVE_EVIDENCE_MARKERS = [
     "accessibility",
 ]
 
+AUTO_COMPOSITION_PATH_MARKERS = ["contracts/**", "sidecars/**", "templates/**"]
+
 COMPOSITION_WORKFLOW_MARKERS = [
-    "contracts/**",
-    "sidecars/**",
-    "templates/**",
     "audit_page_composition.py",
     "build_visual_target.py",
     "validate_visual_target.py",
@@ -212,22 +211,49 @@ def validate_visual_target_schema(root: Path):
     return errors
 
 
+def workflow_events(workflow: str):
+    """Read event names from the top-level YAML 'on' block without a YAML dependency."""
+    lines = workflow.splitlines()
+    if "on:" not in lines:
+        return []
+    events = []
+    for line in lines[lines.index("on:") + 1:]:
+        if line and line[0] not in " \t#":
+            break
+        if line.startswith("  ") and not line.startswith(("   ", "  #")) and ":" in line:
+            events.append(line.strip().split(":", 1)[0])
+    return events
+
+
 def validate_workflow_wiring(root: Path):
     errors = []
     composition_path = root / ".github" / "workflows" / "composition-contract.yml"
     if not composition_path.is_file():
         return ["composition-contract.yml: workflow missing"]
     composition = composition_path.read_text(encoding="utf-8")
+    events = workflow_events(composition)
+    if "workflow_dispatch" not in events:
+        errors.append("composition-contract.yml: workflow_dispatch must remain available")
     for marker in COMPOSITION_WORKFLOW_MARKERS:
         if marker not in composition:
             errors.append(f"composition-contract.yml: required wiring missing: {marker}")
+    # PR #51 deliberately paused private-repo push/PR jobs because GitHub
+    # could not assign runners. Re-enable path coverage checks if any other
+    # event is enabled, but do not mistake manual-only operation for a defect.
+    if events != ["workflow_dispatch"]:
+        for marker in AUTO_COMPOSITION_PATH_MARKERS:
+            if marker not in composition:
+                errors.append(f"composition-contract.yml: required wiring missing: {marker}")
 
     toolkit_workflow_path = root / ".github" / "workflows" / "toolkit-contract.yml"
     if not toolkit_workflow_path.is_file():
         errors.append("toolkit-contract.yml: workflow missing")
     else:
         toolkit_workflow = toolkit_workflow_path.read_text(encoding="utf-8")
-        if "contracts/**" not in toolkit_workflow:
+        toolkit_events = workflow_events(toolkit_workflow)
+        if "workflow_dispatch" not in toolkit_events:
+            errors.append("toolkit-contract.yml: workflow_dispatch must remain available")
+        if toolkit_events != ["workflow_dispatch"] and "contracts/**" not in toolkit_workflow:
             errors.append("toolkit-contract.yml: contract schema changes must trigger toolkit validation")
     return errors
 

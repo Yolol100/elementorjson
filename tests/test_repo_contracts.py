@@ -3,6 +3,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -106,19 +107,56 @@ class RepositoryContractTests(unittest.TestCase):
             ["explicit", "declared", "inferred", "unknown"],
         )
 
-    def test_composition_workflow_covers_contracts_sidecars_auditor_and_visual_target(self):
+    def test_composition_workflow_keeps_manual_dispatch_and_visual_target_wiring(self):
         self.assertEqual(validate_workflow_wiring(ROOT), [])
         workflow = (ROOT / ".github" / "workflows" / "composition-contract.yml").read_text(encoding="utf-8")
+        self.assertIn("  workflow_dispatch:", workflow)
         for marker in [
-            "contracts/**", "sidecars/**", "templates/**", "audit_page_composition.py", "build_visual_target.py",
-            "validate_visual_target.py", ".design-intent.json", ".content-contract.json", "visual-targets",
+            "audit_page_composition.py", "build_visual_target.py", "validate_visual_target.py",
+            ".design-intent.json", ".content-contract.json", "visual-targets",
         ]:
             self.assertIn(marker, workflow)
 
-    def test_toolkit_push_triggers_on_contract_and_sidecar_changes(self):
+    def test_toolkit_workflow_keeps_manual_dispatch(self):
         workflow = (ROOT / ".github" / "workflows" / "toolkit-contract.yml").read_text(encoding="utf-8")
-        self.assertIn("contracts/**", workflow)
-        self.assertIn("sidecars/**", workflow)
+        self.assertIn("  workflow_dispatch:", workflow)
+
+    def test_reenabling_automatic_triggers_requires_complete_path_coverage(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            for name in ("composition-contract.yml", "toolkit-contract.yml"):
+                original = (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+                self.assertIn("on:\n  workflow_dispatch:\n", original)
+                workflows.joinpath(name).write_text(
+                    original.replace(
+                        "on:\n  workflow_dispatch:\n",
+                        "on:\n  workflow_dispatch:\n  push:\n    branches: [main]\n",
+                        1,
+                    ),
+                    encoding="utf-8",
+                )
+            errors = validate_workflow_wiring(root)
+            self.assertTrue(any("composition-contract.yml: required wiring missing: contracts/**" in e for e in errors), errors)
+            self.assertTrue(any("composition-contract.yml: required wiring missing: sidecars/**" in e for e in errors), errors)
+            self.assertTrue(any("composition-contract.yml: required wiring missing: templates/**" in e for e in errors), errors)
+            self.assertTrue(any("toolkit-contract.yml: contract schema changes" in e for e in errors), errors)
+
+    def test_removing_manual_dispatch_fails_closed(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            for name in ("composition-contract.yml", "toolkit-contract.yml"):
+                original = (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+                workflows.joinpath(name).write_text(
+                    original.replace("  workflow_dispatch:\n", "", 1),
+                    encoding="utf-8",
+                )
+            errors = validate_workflow_wiring(root)
+            self.assertTrue(any("composition-contract.yml: workflow_dispatch" in e for e in errors), errors)
+            self.assertTrue(any("toolkit-contract.yml: workflow_dispatch" in e for e in errors), errors)
 
 
 if __name__ == "__main__":
