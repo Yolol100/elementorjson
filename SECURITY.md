@@ -22,6 +22,15 @@ GitHub CodeQL scans supported JavaScript/TypeScript, Python and GitHub Actions s
 
 Dependabot monitors npm and GitHub Actions updates. [CVE-2026-97058](https://github.com/advisories/ghsa-hp3w-g68c-fv3c) has no upstream `sprintf-js` patch. This repository removes the vulnerable development-only dependency chain `@wordpress/env -> js-yaml@3 -> argparse@1 -> sprintf-js` by pinning `argparse@2.0.1` in npm `overrides`. Keep `npm ci`, `npm audit`, the lockfile regression and the pinned WordPress CLI smoke tests green. Reevaluate the override when `@wordpress/env` drops `js-yaml@3` naturally; do not claim a patched `sprintf-js` version.
 
+## Public pull request isolation
+
+Automatic pull request and main-push QA must run in Free/Core mode. Even if
+`ELEMENTOR_PRO_LICENSE_KEY` is configured later, it is available only when the
+runtime QA workflow is **manually dispatched on `main`**. This prevents an
+automated pull request from receiving the license credential via WordPress
+plugin code or shell steps. GitHub workflow `validate.yml` includes a negative
+regression test to reject unguarded Pro secret references.
+
 ## Evidence boundary
 
 A green repository run proves only the controlled environment and checks that actually executed. It does not prove target authorization, staging/production compatibility, full accessibility, production security or live-site correctness.

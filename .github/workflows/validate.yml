@@ -148,7 +148,7 @@ jobs:
       - name: Install and activate pinned QA dependencies
         shell: bash
         env:
-          ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
+          ELEMENTOR_PRO_LICENSE_KEY: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && secrets.ELEMENTOR_PRO_LICENSE_KEY || '' }}
         run: |
           set -euo pipefail
           npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION" --activate
@@ -329,7 +329,7 @@ jobs:
         if: always()
         shell: bash
         env:
-          ELEMENTOR_PRO_LICENSE_KEY: ${{ secrets.ELEMENTOR_PRO_LICENSE_KEY }}
+          ELEMENTOR_PRO_LICENSE_KEY: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && secrets.ELEMENTOR_PRO_LICENSE_KEY || '' }}
         run: |
           if [[ -n "${ELEMENTOR_PRO_LICENSE_KEY:-}" ]]; then
             npx wp-env run cli wp plugin is-active elementor-pro >/dev/null 2>&1 \
