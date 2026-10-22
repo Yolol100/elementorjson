@@ -225,36 +225,109 @@ def workflow_events(workflow: str):
     return events
 
 
+def workflow_event_body(workflow: str, event: str):
+    """Return the source body of a top-level GitHub Actions event.
+
+    Deliberately parse the simple literal on block used by this repository.
+    If an event is moved or loses its branches or paths, acceptance must fail.
+    """
+    lines = workflow.splitlines()
+    if "on:" not in lines:
+        return ""
+    started = False
+    body = []
+    for line in lines[lines.index("on:") + 1:]:
+        if line and line[0] not in " \t#":
+            break
+        if line == f"  {event}:":
+            started = True
+            continue
+        if started and line.startswith("  ") and not line.startswith(("   ", "  #")):
+            break
+        if started:
+            body.append(line)
+    return "\n".join(body)
+
+
 def validate_workflow_wiring(root: Path):
     errors = []
-    composition_path = root / ".github" / "workflows" / "composition-contract.yml"
-    if not composition_path.is_file():
-        return ["composition-contract.yml: workflow missing"]
-    composition = composition_path.read_text(encoding="utf-8")
-    events = workflow_events(composition)
-    if "workflow_dispatch" not in events:
-        errors.append("composition-contract.yml: workflow_dispatch must remain available")
+    workflows = {}
+    names = ("composition-contract.yml", "toolkit-contract.yml", "validate.yml",
+             "native-kit-contract.yml", "codeql.yml")
+    for name in names:
+        path = root / ".github" / "workflows" / name
+        if not path.is_file():
+            errors.append(f"{name}: workflow missing")
+            continue
+        text = path.read_text(encoding="utf-8")
+        workflows[name] = text
+        events = workflow_events(text)
+        required = ("workflow_dispatch", "push", "pull_request")
+        if name == "codeql.yml":
+            required += ("schedule",)
+        for event in required:
+            if event not in events:
+                errors.append(f"{name}: {event} must remain available")
+        for event in ("push", "pull_request"):
+            body = workflow_event_body(text, event)
+            if "    branches: [main]" not in body.splitlines():
+                errors.append(f"{name}: {event} must target main explicitly")
+
+    composition = workflows.get("composition-contract.yml", "")
     for marker in COMPOSITION_WORKFLOW_MARKERS:
         if marker not in composition:
             errors.append(f"composition-contract.yml: required wiring missing: {marker}")
-    # PR #51 deliberately paused private-repo push/PR jobs because GitHub
-    # could not assign runners. Re-enable path coverage checks if any other
-    # event is enabled, but do not mistake manual-only operation for a defect.
-    if events != ["workflow_dispatch"]:
+    for event in ("push", "pull_request"):
+        body = workflow_event_body(composition, event)
         for marker in AUTO_COMPOSITION_PATH_MARKERS:
-            if marker not in composition:
-                errors.append(f"composition-contract.yml: required wiring missing: {marker}")
+            if f"      - '{marker}'" not in body.splitlines():
+                errors.append(f"composition-contract.yml: required wiring missing: {marker} ({event})")
 
-    toolkit_workflow_path = root / ".github" / "workflows" / "toolkit-contract.yml"
-    if not toolkit_workflow_path.is_file():
-        errors.append("toolkit-contract.yml: workflow missing")
-    else:
-        toolkit_workflow = toolkit_workflow_path.read_text(encoding="utf-8")
-        toolkit_events = workflow_events(toolkit_workflow)
-        if "workflow_dispatch" not in toolkit_events:
-            errors.append("toolkit-contract.yml: workflow_dispatch must remain available")
-        if toolkit_events != ["workflow_dispatch"] and "contracts/**" not in toolkit_workflow:
-            errors.append("toolkit-contract.yml: contract schema changes must trigger toolkit validation")
+    toolkit = workflows.get("toolkit-contract.yml", "")
+    for event in ("push", "pull_request"):
+        body = workflow_event_body(toolkit, event)
+        if "      - 'contracts/**'" not in body.splitlines():
+            errors.append(
+                f"toolkit-contract.yml: contract schema changes must trigger toolkit validation ({event})"
+            )
+
+    native = workflows.get("native-kit-contract.yml", "")
+    for event in ("push", "pull_request"):
+        body = workflow_event_body(native, event)
+        for marker in (".wp-env.json", "wordpress-plugin/**", "templates/**",
+                       "package.json", "package-lock.json"):
+            if f"      - '{marker}'" not in body.splitlines():
+                errors.append(f"native-kit-contract.yml: {event} path missing: {marker}")
+
+    codeql = workflows.get("codeql.yml", "")
+    for marker in ("security-events: write", "javascript-typescript",
+                   "python", "actions", "security-extended"):
+        if marker not in codeql:
+            errors.append(f"codeql.yml: required scanning marker missing: {marker}")
+    if "secrets." in codeql:
+        errors.append("codeql.yml: do not access secrets in pull request analysis")
+    return errors
+
+
+def validate_dependency_security_override(root: Path):
+    """Block reintroduction of the unpatched transitive sprintf-js dependency."""
+    package, package_errors = load_object(root / "package.json")
+    lock, lock_errors = load_object(root / "package-lock.json")
+    errors = package_errors + lock_errors
+    if package is not None:
+        overrides = package.get("overrides")
+        if not isinstance(overrides, dict) or overrides.get("argparse") != "2.0.1":
+            errors.append("package.json: argparse must be overridden to 2.0.1")
+    if lock is not None:
+        packages = lock.get("packages")
+        if not isinstance(packages, dict):
+            errors.append("package-lock.json: packages map missing")
+        else:
+            if "node_modules/sprintf-js" in packages:
+                errors.append("package-lock.json: unpatched sprintf-js must not be installed")
+            argparse = packages.get("node_modules/argparse")
+            if not isinstance(argparse, dict) or argparse.get("version") != "2.0.1":
+                errors.append("package-lock.json: pinned argparse version must be 2.0.1")
     return errors
 
 
@@ -287,6 +360,7 @@ def validate_repository_contracts(root=Path(".")):
         if "the repository is public." not in integration.lower():
             errors.append("project-elementor-integration.md: public repository boundary must remain explicit")
     errors.extend(validate_workflow_wiring(root))
+    errors.extend(validate_dependency_security_override(root))
     return errors
 
 

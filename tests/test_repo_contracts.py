@@ -14,6 +14,7 @@ from validate_repo_contracts import (
     validate_toolkit,
     validate_visual_target_schema,
     validate_workflow_wiring,
+    validate_dependency_security_override,
 )
 
 
@@ -121,7 +122,7 @@ class RepositoryContractTests(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "toolkit-contract.yml").read_text(encoding="utf-8")
         self.assertIn("  workflow_dispatch:", workflow)
 
-    def test_reenabling_automatic_triggers_requires_complete_path_coverage(self):
+    def test_automatic_path_filters_remain_required(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             workflows = root / ".github" / "workflows"
@@ -158,13 +159,14 @@ class RepositoryContractTests(unittest.TestCase):
             "toolkit-contract.yml", "native-kit-contract.yml",
         ):
             workflow = (ROOT / ".github" / "workflows" / workflow_name).read_text(encoding="utf-8")
-            from validate_repo_contracts import workflow_events
+            from validate_repo_contracts import workflow_events, workflow_event_body
             events = workflow_events(workflow)
             with self.subTest(workflow=workflow_name):
                 self.assertIn("workflow_dispatch", events)
                 self.assertIn("push", events)
                 self.assertIn("pull_request", events)
-                self.assertIn("branches: [main]", workflow)
+                for event in ("push", "pull_request"):
+                    self.assertIn("    branches: [main]", workflow_event_body(workflow, event).splitlines())
 
     def test_security_scan_is_automated_without_secrets(self):
         workflow = (ROOT / ".github" / "workflows" / "codeql.yml").read_text(encoding="utf-8")
@@ -176,6 +178,65 @@ class RepositoryContractTests(unittest.TestCase):
         for item in ("security-events: write", "javascript-typescript", "python", "actions"):
             self.assertIn(item, workflow)
         self.assertNotIn("secrets.", workflow)
+
+    def test_automatic_ci_mutations_fail_closed(self):
+        scenarios = (
+            ("native-kit-contract.yml", "wrong_branch", "pull_request must target main"),
+            ("codeql.yml", "wrong_branch", "pull_request must target main"),
+            ("toolkit-contract.yml", "remove_contract_path", "contract schema changes must trigger"),
+            ("composition-contract.yml", "remove_template_path", "required wiring missing: templates/**"),
+            ("codeql.yml", "remove_permission", "required scanning marker missing: security-events: write"),
+        )
+        names = (
+            "validate.yml", "native-kit-contract.yml", "composition-contract.yml",
+            "toolkit-contract.yml", "codeql.yml",
+        )
+        for filename, mutation, expected in scenarios:
+            with self.subTest(file=filename, mutation=mutation), TemporaryDirectory() as directory:
+                workflows = Path(directory) / ".github" / "workflows"
+                workflows.mkdir(parents=True)
+                for name in names:
+                    text = (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+                    if name == filename:
+                        if mutation == "wrong_branch":
+                            before, marker, after = text.partition("  pull_request:")
+                            self.assertTrue(marker)
+                            self.assertIn("    branches: [main]", after)
+                            text = before + marker + after.replace(
+                                "    branches: [main]", "    branches: [wrong-branch]", 1
+                            )
+                        elif mutation in ("remove_contract_path", "remove_template_path"):
+                            path = "contracts/**" if mutation == "remove_contract_path" else "templates/**"
+                            before, marker, after = text.partition("  pull_request:")
+                            self.assertTrue(marker)
+                            self.assertIn("      - '" + path + "'", after)
+                            text = before + marker + after.replace("      - '" + path + "'", "", 1)
+                        else:
+                            self.assertIn("security-events: write", text)
+                            text = text.replace("security-events: write", "security-events: read", 1)
+                    (workflows / name).write_text(text, encoding="utf-8")
+                errors = validate_workflow_wiring(Path(directory))
+                self.assertTrue(any(expected in error for error in errors), errors)
+
+    def test_dependency_override_and_vulnerable_package_mutations_fail_closed(self):
+        original_package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+        original_lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
+        for mutation, expected in (
+            ("remove_override", "argparse must be overridden"),
+            ("restore_sprintf", "unpatched sprintf-js must not be installed"),
+        ):
+            with self.subTest(mutation=mutation), TemporaryDirectory() as directory:
+                folder = Path(directory)
+                package = copy.deepcopy(original_package)
+                lock = copy.deepcopy(original_lock)
+                if mutation == "remove_override":
+                    self.assertEqual(package["overrides"].pop("argparse"), "2.0.1")
+                else:
+                    lock["packages"]["node_modules/sprintf-js"] = {"version": "1.0.3"}
+                (folder / "package.json").write_text(json.dumps(package), encoding="utf-8")
+                (folder / "package-lock.json").write_text(json.dumps(lock), encoding="utf-8")
+                errors = validate_dependency_security_override(folder)
+                self.assertTrue(any(expected in error for error in errors), errors)
 
     def test_removing_manual_dispatch_fails_closed(self):
         with TemporaryDirectory() as directory:
