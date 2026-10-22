@@ -50,7 +50,7 @@ Gebruik hem niet voor:
 
 - productie- of live-site-mutaties;
 - het verzinnen van site-, media-, form-, Loop-, query- of Dynamic Tag-ID's;
-- vertrouwelijke klantdata zonder taakgebonden private runtimebeleid;
+- vertrouwelijke klantdata in deze publieke repository;
 - een source-only taak waarvoor geen runtimeclaim nodig is.
 
 ## Bewijsgrenzen

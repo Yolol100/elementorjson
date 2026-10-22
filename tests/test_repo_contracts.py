@@ -144,6 +144,14 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertTrue(any("composition-contract.yml: required wiring missing: templates/**" in e for e in errors), errors)
             self.assertTrue(any("toolkit-contract.yml: contract schema changes" in e for e in errors), errors)
 
+    def test_dependency_lock_excludes_unpatched_sprintf_js(self):
+        # GHSA-hp3w-g68c-fv3c has no upstream sprintf-js patched release.
+        # Eliminate the transitive dependency with the pinned argparse override.
+        lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
+        packages = lock["packages"]
+        self.assertNotIn("node_modules/sprintf-js", packages)
+        self.assertEqual(packages["node_modules/argparse"]["version"], "2.0.1")
+
     def test_public_ci_auto_triggers_cover_main_and_pull_requests(self):
         for workflow_name in (
             "validate.yml", "composition-contract.yml",
