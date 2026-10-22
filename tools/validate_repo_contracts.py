@@ -306,6 +306,16 @@ def validate_workflow_wiring(root: Path):
             errors.append(f"codeql.yml: required scanning marker missing: {marker}")
     if "secrets." in codeql:
         errors.append("codeql.yml: do not access secrets in pull request analysis")
+
+    # On a public repository, automatic pull_request/push checks execute
+    # checked-out code; no Pro license may flow to those events. Preserve the
+    # optional Pro contract exclusively for deliberate main-branch dispatch.
+    qa = workflows.get("validate.yml", "")
+    protected_pro_secret = "ELEMENTOR_PRO_LICENSE_KEY: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && secrets.ELEMENTOR_PRO_LICENSE_KEY || '' }}"
+    if qa.count("secrets.ELEMENTOR_PRO_LICENSE_KEY") != 2 or qa.count(protected_pro_secret) != 2:
+        errors.append(
+            "validate.yml: Elementor Pro secret must be gated to manual workflow_dispatch on main"
+        )
     return errors
 
 

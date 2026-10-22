@@ -218,6 +218,45 @@ class RepositoryContractTests(unittest.TestCase):
                 errors = validate_workflow_wiring(Path(directory))
                 self.assertTrue(any(expected in error for error in errors), errors)
 
+
+    def test_pro_secret_available_only_to_manual_dispatch_on_main(self):
+        workflow = (ROOT / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
+        guard = "ELEMENTOR_PRO_LICENSE_KEY: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && secrets.ELEMENTOR_PRO_LICENSE_KEY || '' }}"
+        self.assertEqual(workflow.count(guard), 2)
+        self.assertEqual(workflow.count("secrets.ELEMENTOR_PRO_LICENSE_KEY"), 2)
+        # Negative fixtures: removing the event/ref gate on either installation
+        # or cleanup must be rejected by the repository contract validator.
+        pieces = workflow.split(guard)
+        self.assertEqual(len(pieces), 3)
+        names = ("composition-contract.yml", "toolkit-contract.yml", "validate.yml",
+                 "native-kit-contract.yml", "codeql.yml")
+        # Mutate the event or ref only. This proves the trusted-manual-main
+        # boundary without embedding a literal unguarded secret expression,
+        # which would generate a spurious CodeQL cleartext-secret alert.
+        unsafe_variants = (
+            ("auto_pull_request", guard.replace(
+                "github.event_name == 'workflow_dispatch'",
+                "github.event_name == 'pull_request'")),
+            ("untrusted_branch", guard.replace(
+                "github.ref == 'refs/heads/main'",
+                "github.ref == 'refs/heads/feature'")),
+        )
+        for mutation, unsafe in unsafe_variants:
+            self.assertNotEqual(unsafe, guard)
+            for bad_step in (0, 1):
+                with self.subTest(mutation=mutation, step=bad_step), TemporaryDirectory() as directory:
+                    workflows = Path(directory) / ".github" / "workflows"
+                    workflows.mkdir(parents=True)
+                    for name in names:
+                        source = (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+                        if name == "validate.yml":
+                            source = (pieces[0] + (unsafe if bad_step == 0 else guard)
+                                      + pieces[1] + (guard if bad_step == 0 else unsafe)
+                                      + pieces[2])
+                        workflows.joinpath(name).write_text(source, encoding="utf-8")
+                    errors = validate_workflow_wiring(Path(directory))
+                    self.assertTrue(any("Elementor Pro secret must be gated" in e for e in errors), errors)
+
     def test_dependency_override_and_vulnerable_package_mutations_fail_closed(self):
         original_package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         original_lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
