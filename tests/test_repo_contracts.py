@@ -169,6 +169,16 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertIn(item, workflow)
         self.assertNotIn("secrets.", workflow)
 
+    def test_unpatched_sprintf_js_is_absent_from_locked_development_dependencies(self):
+        # GHSA-hp3w-g68c-fv3c has no fixed sprintf-js release.
+        # Reject reintroductions while the dev-only argparse override is needed.
+        lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
+        packages = lock["packages"]
+        self.assertNotIn("node_modules/sprintf-js", packages)
+        self.assertEqual(packages["node_modules/argparse"]["version"], "2.0.1")
+        package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+        self.assertEqual(package["overrides"]["argparse"], "2.0.1")
+
     def test_removing_manual_dispatch_fails_closed(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

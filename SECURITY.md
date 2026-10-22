@@ -20,7 +20,7 @@ This public repository and its Git history are visible to anyone. Only sanitized
 
 GitHub CodeQL scans supported JavaScript/TypeScript, Python and GitHub Actions sources on changes and weekly. CodeQL does not scan this project's PHP source; WordPress runtime and other PHP/security acceptance require separate checks.
 
-Dependabot monitors npm and GitHub Actions updates. As of 22 October 2026, [CVE-2026-97058](https://github.com/advisories/ghsa-hp3w-g68c-fv3c) affects `sprintf-js` via `@wordpress/env -> js-yaml@3 -> argparse@1` and has no upstream patched release. The package is confined to development/test tooling in this project; never pass untrusted user-supplied format strings to it. Keep the alert open until a tested upstream fix or dependency removal is available. Do not suppress the alert as fixed.
+Dependabot monitors npm and GitHub Actions updates. [CVE-2026-97058](https://github.com/advisories/ghsa-hp3w-g68c-fv3c) has no upstream patched `sprintf-js` release. The pinned development-only dependency tree now overrides `argparse` to `2.0.1`, which removes `sprintf-js` instead of falsely claiming a patched version. Verify `npm ci`, `npm audit --audit-level=low`, `js-yaml` parsing and the WordPress/Elementor runtime after each change to the override. Reassess this workaround when `@wordpress/env` no longer depends on `js-yaml@3`; never ignore newly detected advisories.
 
 ## Evidence boundary
 
