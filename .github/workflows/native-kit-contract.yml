@@ -2,6 +2,30 @@ name: Native Elementor Kit Contract
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/native-kit-contract.yml'
+      - '.wp-env.json'
+      - 'wordpress-plugin/**'
+      - 'templates/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'runtime-contract.json'
+      - 'toolkit-contract.json'
+      - 'tools/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/native-kit-contract.yml'
+      - '.wp-env.json'
+      - 'wordpress-plugin/**'
+      - 'templates/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'runtime-contract.json'
+      - 'toolkit-contract.json'
+      - 'tools/**'
 
 permissions:
   contents: read

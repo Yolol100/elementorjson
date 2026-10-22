@@ -88,13 +88,13 @@ def validate_runtime(value):
         errors.append("runtime-contract.json: evidence.source_prediction_level must remain source_prediction")
 
     privacy = value.get("privacy") if isinstance(value.get("privacy"), dict) else {}
-    if privacy.get("repository_visibility_assumption") != "private":
-        errors.append("runtime-contract.json: privacy.repository_visibility_assumption must remain private")
+    if privacy.get("repository_visibility_assumption") != "public":
+        errors.append("runtime-contract.json: privacy.repository_visibility_assumption must remain public")
     privacy_rule = privacy.get("rule") if isinstance(privacy.get("rule"), str) else ""
-    if "private repository visibility" not in privacy_rule.lower():
-        errors.append("runtime-contract.json: privacy rule must state that private visibility does not waive the data boundary")
-    if "public repository" in json.dumps(value, ensure_ascii=False).lower():
-        errors.append("runtime-contract.json: stale public-repository wording is not allowed for the private runtime")
+    if "public repository visibility" not in privacy_rule.lower():
+        errors.append("runtime-contract.json: privacy rule must state that public visibility does not waive the data boundary")
+    if "private repository" in json.dumps(value, ensure_ascii=False).lower():
+        errors.append("runtime-contract.json: stale private-repository wording is not allowed for the public runtime")
     does_not_prove = evidence.get("does_not_prove")
     if not isinstance(does_not_prove, list) or not does_not_prove or not all(isinstance(item, str) and item.strip() for item in does_not_prove):
         errors.append("runtime-contract.json: evidence.does_not_prove must remain a non-empty list of explicit limitations")
@@ -282,10 +282,10 @@ def validate_repository_contracts(root=Path(".")):
         errors.append("project-elementor-integration.md: file missing")
     else:
         integration = integration_path.read_text(encoding="utf-8")
-        if "The repository is public." in integration:
-            errors.append("project-elementor-integration.md: stale public repository statement")
-        if "repository is private" not in integration.lower():
-            errors.append("project-elementor-integration.md: private repository boundary must remain explicit")
+        if "repository is private" in integration.lower():
+            errors.append("project-elementor-integration.md: stale private repository statement")
+        if "the repository is public." not in integration.lower():
+            errors.append("project-elementor-integration.md: public repository boundary must remain explicit")
     errors.extend(validate_workflow_wiring(root))
     return errors
 

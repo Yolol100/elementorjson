@@ -21,17 +21,17 @@ class RepositoryContractTests(unittest.TestCase):
     def test_repository_contracts_match_elementor_runtime_boundaries(self):
         self.assertEqual(validate_repository_contracts(ROOT), [])
 
-    def test_runtime_rejects_public_visibility_regression(self):
+    def test_runtime_rejects_private_visibility_regression(self):
         runtime = json.loads((ROOT / "runtime-contract.json").read_text(encoding="utf-8"))
-        runtime["privacy"]["repository_visibility_assumption"] = "public"
+        runtime["privacy"]["repository_visibility_assumption"] = "private"
         errors = validate_runtime(runtime)
         self.assertTrue(any("repository_visibility_assumption" in error for error in errors), errors)
 
-    def test_runtime_rejects_stale_public_repository_wording(self):
+    def test_runtime_rejects_stale_private_repository_wording(self):
         runtime = json.loads((ROOT / "runtime-contract.json").read_text(encoding="utf-8"))
-        runtime["inputs"]["reference_visual"] = "kept outside this public repository when confidential"
+        runtime["inputs"]["reference_visual"] = "kept outside this private repository when confidential"
         errors = validate_runtime(runtime)
-        self.assertTrue(any("stale public-repository wording" in error for error in errors), errors)
+        self.assertTrue(any("stale private-repository wording" in error for error in errors), errors)
 
     def test_runtime_rejects_missing_negative_evidence_boundaries(self):
         runtime = json.loads((ROOT / "runtime-contract.json").read_text(encoding="utf-8"))
@@ -129,12 +129,13 @@ class RepositoryContractTests(unittest.TestCase):
             for name in ("composition-contract.yml", "toolkit-contract.yml"):
                 original = (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
                 self.assertIn("on:\n  workflow_dispatch:\n", original)
+                # Removing mandatory path filters while automatic triggers
+                # stay enabled must fail repository validation.
                 workflows.joinpath(name).write_text(
-                    original.replace(
-                        "on:\n  workflow_dispatch:\n",
-                        "on:\n  workflow_dispatch:\n  push:\n    branches: [main]\n",
-                        1,
-                    ),
+                    original
+                    .replace("      - 'contracts/**'\n", "")
+                    .replace("      - 'sidecars/**'\n", "")
+                    .replace("      - 'templates/**'\n", ""),
                     encoding="utf-8",
                 )
             errors = validate_workflow_wiring(root)
@@ -142,6 +143,31 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertTrue(any("composition-contract.yml: required wiring missing: sidecars/**" in e for e in errors), errors)
             self.assertTrue(any("composition-contract.yml: required wiring missing: templates/**" in e for e in errors), errors)
             self.assertTrue(any("toolkit-contract.yml: contract schema changes" in e for e in errors), errors)
+
+    def test_public_ci_auto_triggers_cover_main_and_pull_requests(self):
+        for workflow_name in (
+            "validate.yml", "composition-contract.yml",
+            "toolkit-contract.yml", "native-kit-contract.yml",
+        ):
+            workflow = (ROOT / ".github" / "workflows" / workflow_name).read_text(encoding="utf-8")
+            from validate_repo_contracts import workflow_events
+            events = workflow_events(workflow)
+            with self.subTest(workflow=workflow_name):
+                self.assertIn("workflow_dispatch", events)
+                self.assertIn("push", events)
+                self.assertIn("pull_request", events)
+                self.assertIn("branches: [main]", workflow)
+
+    def test_security_scan_is_automated_without_secrets(self):
+        workflow = (ROOT / ".github" / "workflows" / "codeql.yml").read_text(encoding="utf-8")
+        from validate_repo_contracts import workflow_events
+        self.assertEqual(
+            set(workflow_events(workflow)),
+            {"workflow_dispatch", "push", "pull_request", "schedule"},
+        )
+        for item in ("security-events: write", "javascript-typescript", "python", "actions"):
+            self.assertIn(item, workflow)
+        self.assertNotIn("secrets.", workflow)
 
     def test_removing_manual_dispatch_fails_closed(self):
         with TemporaryDirectory() as directory:

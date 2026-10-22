@@ -1,6 +1,6 @@
 # Elementor JSON Lab
 
-> **Status:** actief ondersteunend · private controlled Elementor QA-runtime
+> **Status:** actief ondersteunend · public controlled Elementor QA-runtime
 
 Elementor JSON Lab levert reproduceerbaar bewijs voor Elementor JSON. De `elementor` Skill blijft eigenaar van structuur, ontwerpbeslissingen en compatibiliteitsinterpretatie; `webactueel-workflow` blijft de controller. Deze repository is geen productie-deployer en geen live WordPress-bridge.
 
@@ -63,7 +63,7 @@ Gebruik hem niet voor:
 
 ## Privacy en veiligheid
 
-De repository is private, maar private opslag verlaagt de veiligheidsgrenzen niet.
+De repository is public. Alleen gesaniteerde, generieke fixtures mogen worden gecommit; open broncode maakt klantgegevens en secrets direct zichtbaar.
 
 - Commit nooit wachtwoorden, tokens, licentiesleutels, Composer-auth of persoonsgegevens.
 - Gebruik GitHub Actions Secrets voor `ELEMENTOR_PRO_LICENSE_KEY` en andere toegestane credentials.
@@ -72,7 +72,7 @@ De repository is private, maar private opslag verlaagt de veiligheidsgrenzen nie
 
 ## Verificatie
 
-**Status GitHub Actions (18 oktober 2026):** automatische `push`- en `pull_request`-tests staan uit zolang GitHub-hosted runners deze private repository vóór de eerste stap blokkeren. De vijf testworkflows blijven via `workflow_dispatch` beschikbaar; de afzonderlijke runtime-requestworkflow blijft intact. Dit is geen geslaagde QA: voor ieder runtime-, staging- of releasebesluit zijn nog steeds daadwerkelijk uitgevoerde en geslaagde tests vereist. Heractiveer de automatische triggers pas wanneer GitHub de runner-/accountblokkade heeft opgelost.
+**Status GitHub Actions (22 oktober 2026):** de account-/runnerblokkade is opgeheven en de Toolkit, Page Composition, Elementor JSON QA en Native Elementor Kit-workflows hebben op `main` succesvol gedraaid. Automatische `push`- en `pull_request`-triggers zijn opnieuw ingesteld voor de relevante workflows, met `workflow_dispatch` als handmatige herstelroute. CodeQL scant ondersteunde talen bij codewijzigingen en wekelijks. De aparte diagnose- en runtime-requestworkflows blijven bewust handmatig omdat ze taakgericht zijn. Groene CI blijft `controlled_runtime`-bewijs, niet staging-/productieacceptatie.
 
 Voor Python-/JSON-logica:
 

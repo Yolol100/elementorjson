@@ -1,5 +1,10 @@
 # Node / WordPress runtime / Playwright
 node_modules/
+
+# Generated Python bytecode from contract/unit tests
+__pycache__/
+*.py[cod]
+
 .wp-env/
 playwright-report/
 test-results/
