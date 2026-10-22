@@ -185,10 +185,47 @@ for (const template of templates) {
       expect(brokenImages, 'Expected no broken rendered images').toEqual([]);
 
       const focusable = page.locator('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      let keyboardFocusMode = 'no-interactive-controls';
       if ((await focusable.count()) > 0) {
         await page.keyboard.press('Tab');
         const activeTag = await page.evaluate(() => document.activeElement && document.activeElement.tagName);
-        expect(activeTag, 'Expected keyboard focus to move away from BODY').not.toBe('BODY');
+        if (activeTag === 'BODY' && testInfo.project.name === 'webkit') {
+          // WebKit can skip plain links in the default Tab cycle even on pages
+          // without any Elementor code. Only recognize this browser setting
+          // when *all visible controls* are ordinary, enabled links.
+          const visibleLinksOnly = await focusable.evaluateAll((elements) => {
+            const visible = elements.filter((element) => {
+              const style = getComputedStyle(element);
+              const rect = element.getBoundingClientRect();
+              return style.display !== 'none' && style.visibility !== 'hidden' &&
+                rect.width > 0 && rect.height > 0;
+            });
+            return visible.length > 0 && visible.every((element) =>
+              element.matches('a[href]') && element.tabIndex >= 0 &&
+              element.getAttribute('aria-disabled') !== 'true'
+            );
+          });
+          if (visibleLinksOnly) {
+            const link = page.locator('a[href]:visible').first();
+            await link.evaluate((element) => {
+              element.addEventListener('click', (event) => {
+                event.preventDefault(); // Test the key activation without navigating the placeholder '#' URL.
+                element.dataset.ejlKeyboardActivated = 'true';
+              }, { once: true });
+            });
+            await link.focus();
+            await expect(link, 'Expected the ordinary link to accept explicit keyboard focus').toBeFocused();
+            await page.keyboard.press('Enter');
+            await expect(link, 'Expected Enter to activate the focused WebKit link')
+              .toHaveAttribute('data-ejl-keyboard-activated', 'true');
+            keyboardFocusMode = 'webkit-link-only-explicit-focus-enter';
+          } else {
+            expect(activeTag, 'Expected Tab to focus a non-link interactive control').not.toBe('BODY');
+          }
+        } else {
+          expect(activeTag, 'Expected keyboard focus to move away from BODY').not.toBe('BODY');
+          keyboardFocusMode = 'tab-navigation';
+        }
       }
 
       const layoutSnapshot = await captureLayoutSnapshot(page);
@@ -204,6 +241,25 @@ for (const template of templates) {
         animations: 'disabled'
       });
 
+      const pageOrigin = new URL(page.url());
+      const isLocalWebkitLinkOnly = testInfo.project.name === 'webkit' &&
+        keyboardFocusMode === 'webkit-link-only-explicit-focus-enter' &&
+        pageOrigin.protocol === 'http:' &&
+        ['127.0.0.1', 'localhost'].includes(pageOrigin.hostname);
+      // WordPress Core outputs speculative prefetch rules for anonymous pages.
+      // WebKit rejects this opt-in optimization on the HTTP-only local runtime
+      // when a link is activated. Keep raw console_errors visible in evidence;
+      // accept only this exact environment error, never arbitrary JS errors.
+      const webkitLocalPrefetchMessage = 'Prefetch request denied: URL must be secure (HTTPS)';
+      const knownEnvironmentWarnings = isLocalWebkitLinkOnly
+        ? consoleErrors.filter((message) => message === webkitLocalPrefetchMessage)
+        : [];
+      const unexpectedConsoleErrors = consoleErrors.filter((message) =>
+        !(isLocalWebkitLinkOnly && message === webkitLocalPrefetchMessage)
+      );
+      expect(knownEnvironmentWarnings.length, 'Expected at most one known WebKit localhost prefetch warning')
+        .toBeLessThanOrEqual(1);
+
       fs.writeFileSync(
         path.join(screenshotDir, `${basename}.json`),
         JSON.stringify({
@@ -216,16 +272,21 @@ for (const template of templates) {
           title: await page.title(),
           browser_errors: browserErrors,
           console_errors: consoleErrors,
+          known_environment_warnings: knownEnvironmentWarnings,
           failed_requests: failedRequests,
           bad_responses: badResponses,
           horizontal_overflow: overflow,
           broken_images: brokenImages,
+          keyboard_focus_mode: keyboardFocusMode,
+          keyboard_focus_limitation: keyboardFocusMode === 'webkit-link-only-explicit-focus-enter'
+            ? 'WebKit default Tab navigation skips ordinary links. Explicit focus and Enter activation were verified, not Tab reachability.'
+            : null,
           layout_snapshot: layoutSnapshot
         }, null, 2) + '\n'
       );
 
       expect(browserErrors, 'Expected no uncaught browser errors').toEqual([]);
-      expect(consoleErrors, 'Expected no browser console errors').toEqual([]);
+      expect(unexpectedConsoleErrors, 'Expected no unexpected browser console errors').toEqual([]);
       expect(failedRequests, 'Expected no failed same-origin requests').toEqual([]);
       expect(badResponses, 'Expected no same-origin HTTP 4xx/5xx asset responses').toEqual([]);
     });
