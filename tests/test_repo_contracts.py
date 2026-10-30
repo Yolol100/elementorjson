@@ -268,6 +268,9 @@ class RepositoryContractTests(unittest.TestCase):
             ("restore_body_parser_lock", "body-parser must be pinned to 1.20.9"),
             ("restore_fast_uri_lock", "fast-uri must be pinned to 3.1.9"),
             ("remove_body_parser_integrity", "body-parser must retain npm sha512 integrity"),
+            ("remove_qs_override", "qs must be overridden to 6.17.1"),
+            ("restore_qs_lock", "qs must be pinned to 6.17.1"),
+            ("remove_qs_integrity", "qs must retain audited sha512 integrity"),
         ):
             with self.subTest(mutation=mutation), TemporaryDirectory() as directory:
                 folder = Path(directory)
@@ -287,6 +290,12 @@ class RepositoryContractTests(unittest.TestCase):
                     lock["packages"]["node_modules/fast-uri"]["version"] = "3.1.8"
                 elif mutation == "remove_body_parser_integrity":
                     lock["packages"]["node_modules/body-parser"].pop("integrity")
+                elif mutation == "remove_qs_override":
+                    package["overrides"].pop("qs")
+                elif mutation == "restore_qs_lock":
+                    lock["packages"]["node_modules/qs"]["version"] = "6.16.0"
+                elif mutation == "remove_qs_integrity":
+                    lock["packages"]["node_modules/qs"]["integrity"] = "sha512-tampered"
                 (folder / "package.json").write_text(json.dumps(package), encoding="utf-8")
                 (folder / "package-lock.json").write_text(json.dumps(lock), encoding="utf-8")
                 errors = validate_dependency_security_override(folder)
