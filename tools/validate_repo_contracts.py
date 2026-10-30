@@ -328,7 +328,7 @@ def validate_dependency_security_override(root: Path):
         overrides = package.get("overrides")
         if not isinstance(overrides, dict) or overrides.get("argparse") != "2.0.1":
             errors.append("package.json: argparse must be overridden to 2.0.1")
-        for name, version in (("body-parser", "1.20.9"), ("fast-uri", "3.1.9")):
+        for name, version in (("body-parser", "1.20.9"), ("fast-uri", "3.1.9"), ("qs", "6.17.1")):
             if not isinstance(overrides, dict) or overrides.get(name) != version:
                 errors.append(f"package.json: {name} must be overridden to {version}")
     if lock is not None:
@@ -341,12 +341,15 @@ def validate_dependency_security_override(root: Path):
             argparse = packages.get("node_modules/argparse")
             if not isinstance(argparse, dict) or argparse.get("version") != "2.0.1":
                 errors.append("package-lock.json: pinned argparse version must be 2.0.1")
-            for name, version in (("body-parser", "1.20.9"), ("fast-uri", "3.1.9")):
+            for name, version in (("body-parser", "1.20.9"), ("fast-uri", "3.1.9"), ("qs", "6.17.1")):
                 entry = packages.get(f"node_modules/{name}")
                 if not isinstance(entry, dict) or entry.get("version") != version:
                     errors.append(f"package-lock.json: {name} must be pinned to {version}")
                 elif not isinstance(entry.get("integrity"), str) or not entry["integrity"].startswith("sha512-"):
                     errors.append(f"package-lock.json: {name} must retain npm sha512 integrity")
+            qs = packages.get("node_modules/qs")
+            if isinstance(qs, dict) and qs.get("integrity") != "sha512-jd3COkaKVgGUW+ZHyEHCG9bH7RoaaiWuMgzsIBjUMVjLAaWGWpoUAVwljVvBHxRu/2qEHnadLGZrkutYUBPQJA==":
+                errors.append("package-lock.json: qs must retain audited sha512 integrity")
     return errors
 
 
