@@ -320,7 +320,7 @@ def validate_workflow_wiring(root: Path):
 
 
 def validate_dependency_security_override(root: Path):
-    """Block reintroduction of the unpatched transitive sprintf-js dependency."""
+    """Guard audited, exact transitive security pins in the existing npm dependency graph."""
     package, package_errors = load_object(root / "package.json")
     lock, lock_errors = load_object(root / "package-lock.json")
     errors = package_errors + lock_errors
@@ -328,6 +328,9 @@ def validate_dependency_security_override(root: Path):
         overrides = package.get("overrides")
         if not isinstance(overrides, dict) or overrides.get("argparse") != "2.0.1":
             errors.append("package.json: argparse must be overridden to 2.0.1")
+        for name, version in (("body-parser", "1.20.9"), ("fast-uri", "3.1.9")):
+            if not isinstance(overrides, dict) or overrides.get(name) != version:
+                errors.append(f"package.json: {name} must be overridden to {version}")
     if lock is not None:
         packages = lock.get("packages")
         if not isinstance(packages, dict):
@@ -338,6 +341,12 @@ def validate_dependency_security_override(root: Path):
             argparse = packages.get("node_modules/argparse")
             if not isinstance(argparse, dict) or argparse.get("version") != "2.0.1":
                 errors.append("package-lock.json: pinned argparse version must be 2.0.1")
+            for name, version in (("body-parser", "1.20.9"), ("fast-uri", "3.1.9")):
+                entry = packages.get(f"node_modules/{name}")
+                if not isinstance(entry, dict) or entry.get("version") != version:
+                    errors.append(f"package-lock.json: {name} must be pinned to {version}")
+                elif not isinstance(entry.get("integrity"), str) or not entry["integrity"].startswith("sha512-"):
+                    errors.append(f"package-lock.json: {name} must retain npm sha512 integrity")
     return errors
 
 

@@ -263,6 +263,11 @@ class RepositoryContractTests(unittest.TestCase):
         for mutation, expected in (
             ("remove_override", "argparse must be overridden"),
             ("restore_sprintf", "unpatched sprintf-js must not be installed"),
+            ("remove_body_parser_override", "body-parser must be overridden to 1.20.9"),
+            ("restore_fast_uri_override", "fast-uri must be overridden to 3.1.9"),
+            ("restore_body_parser_lock", "body-parser must be pinned to 1.20.9"),
+            ("restore_fast_uri_lock", "fast-uri must be pinned to 3.1.9"),
+            ("remove_body_parser_integrity", "body-parser must retain npm sha512 integrity"),
         ):
             with self.subTest(mutation=mutation), TemporaryDirectory() as directory:
                 folder = Path(directory)
@@ -270,8 +275,18 @@ class RepositoryContractTests(unittest.TestCase):
                 lock = copy.deepcopy(original_lock)
                 if mutation == "remove_override":
                     self.assertEqual(package["overrides"].pop("argparse"), "2.0.1")
-                else:
+                elif mutation == "restore_sprintf":
                     lock["packages"]["node_modules/sprintf-js"] = {"version": "1.0.3"}
+                elif mutation == "remove_body_parser_override":
+                    package["overrides"].pop("body-parser")
+                elif mutation == "restore_fast_uri_override":
+                    package["overrides"]["fast-uri"] = "3.1.8"
+                elif mutation == "restore_body_parser_lock":
+                    lock["packages"]["node_modules/body-parser"]["version"] = "1.20.8"
+                elif mutation == "restore_fast_uri_lock":
+                    lock["packages"]["node_modules/fast-uri"]["version"] = "3.1.8"
+                elif mutation == "remove_body_parser_integrity":
+                    lock["packages"]["node_modules/body-parser"].pop("integrity")
                 (folder / "package.json").write_text(json.dumps(package), encoding="utf-8")
                 (folder / "package-lock.json").write_text(json.dumps(lock), encoding="utf-8")
                 errors = validate_dependency_security_override(folder)
