@@ -2,9 +2,24 @@ name: Diagnose Elementor importer roundtrip
 
 on:
   workflow_dispatch:
+    inputs:
+      elementor_core_version:
+        description: '4.3.1 current baseline; 4.2.3 legacy importer regression probe (expected Atomic data loss)'
+        required: true
+        type: choice
+        default: '4.3.1'
+        options:
+          - '4.3.1'
+          - '4.2.3'
 
 permissions:
   contents: read
+
+# Keep the supported default aligned with Elementor JSON QA. The explicitly
+# selected legacy version is a negative probe: any semantic loss stays a failure.
+env:
+  ELEMENTOR_CORE_VERSION: ${{ inputs.elementor_core_version }}
+  HELLO_ELEMENTOR_VERSION: '3.5.1'
 
 jobs:
   diagnose:
@@ -16,7 +31,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version: '24.18.0'
 
       - name: Install locked tooling
         run: npm ci --no-fund
@@ -36,9 +51,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wp-env run cli wp plugin install elementor -- --version=4.2.3 --activate
+          npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION" --activate
           npx wp-env run cli wp plugin activate elementor-json-lab
-          npx wp-env run cli wp theme install hello-elementor -- --version=3.4.9 --activate
+          npx wp-env run cli wp theme install hello-elementor -- --version="$HELLO_ELEMENTOR_VERSION" --activate
           npx wp-env run cli wp user get admin --field=ID
 
       - name: Diagnose official importer and semantic roundtrip
