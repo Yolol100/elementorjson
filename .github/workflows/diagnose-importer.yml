@@ -17,6 +17,12 @@ on:
       - '.github/workflows/diagnose-importer.yml'
       - 'tests/test_importer_diagnostic_versions.py'
       - 'tools/compare_elementor_roundtrip.py'
+      - 'tools/validate_elementor_deep.py'
+      - 'wordpress-plugin/elementor-json-lab/**'
+      - '.github/workflows/validate.yml'
+      - '.wp-env.json'
+      - 'package.json'
+      - 'package-lock.json'
       - 'templates/**'
 
 permissions:
