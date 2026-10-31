@@ -1,0 +1,118 @@
+name: Elementor current-version canary (public fixtures)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/current-version-canary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CANARY_WORDPRESS_VERSION: '7.1.4'
+  CANARY_ELEMENTOR_VERSION: '4.3.5'
+  CANARY_HELLO_VERSION: '3.5.1'
+
+jobs:
+  public-canary:
+    name: Isolated WP 7.1.4 / Elementor 4.3.5 / Hello 3.5.1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout approved public fixtures
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.18.0'
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Install locked tooling and audit dependencies
+        run: |
+          npm ci --no-fund
+          npm audit --audit-level=high
+          npx playwright install --with-deps chromium firefox webkit
+      - name: Prepare isolated, temporary WordPress override and fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The committed .wp-env.json and its historical baseline remain untouched.
+          printf '{"core":"WordPress/WordPress#%s"}\n' "$CANARY_WORDPRESS_VERSION" > .wp-env.override.json
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/templates
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/imported
+          mkdir -p wordpress-plugin/elementor-json-lab/.runtime/manifests
+          mkdir -p artifacts/canary-roundtrip artifacts/canary-render artifacts/canary-imported
+          cp templates/*.json wordpress-plugin/elementor-json-lab/.runtime/templates/
+      - name: Start disposable WordPress 7.1.4 runtime
+        run: npx wp-env start
+      - name: Activate exact Elementor and Hello versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp plugin install elementor -- --version="$CANARY_ELEMENTOR_VERSION" --activate
+          npx wp-env run cli wp plugin activate elementor-json-lab
+          npx wp-env run cli wp theme install hello-elementor -- --version="$CANARY_HELLO_VERSION" --activate
+          npx wp-env run cli wp user get admin --field=ID
+          npx wp-env run cli wp rewrite structure '/%postname%/'
+          npx wp-env run cli wp rewrite flush --hard
+      - name: Record and verify exact runtime inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wp-env run cli wp ejl inventory --output=/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/inventory.json
+          cp wordpress-plugin/elementor-json-lab/.runtime/inventory.json artifacts/canary-runtime-inventory.json
+          python3 - <<'PY'
+          import json, os
+          p = 'artifacts/canary-runtime-inventory.json'
+          data = json.load(open(p, encoding='utf-8'))
+          env = data['environment']
+          for name, expected in [('wordpress', 'CANARY_WORDPRESS_VERSION'), ('elementor', 'CANARY_ELEMENTOR_VERSION'), ('theme_version', 'CANARY_HELLO_VERSION')]:
+              assert str(env.get(name)) == os.environ[expected], f'{name}: {env.get(name)} != {os.environ[expected]}'
+          assert str(env.get('php', '')).startswith('8.3.'), env
+          assert not env.get('elementor_pro'), 'This public canary is Free/Core-only.'
+          print('CANARY versions: verified; Core-only, no Pro entitlement claim')
+          PY
+      - name: Verify official importer, semantic roundtrip and render fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for file in templates/*.json; do
+            filename="$(basename "$file")"
+            stem="$(basename "$file" .json)"
+            runtime_source="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/templates/$filename"
+            runtime_imported="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/imported/$filename"
+            python3 tools/audit_elementor_json.py "$file" --inventory artifacts/canary-runtime-inventory.json
+            python3 tools/validate_elementor_deep.py "$file"
+            npx wp-env run cli wp --user=admin elementor library import "$runtime_source" --returnType=ids
+            npx wp-env run cli wp --user=admin ejl export_library --source-template="$runtime_source" --output="$runtime_imported"
+            imported="wordpress-plugin/elementor-json-lab/.runtime/imported/$filename"
+            python3 tools/compare_elementor_roundtrip.py "$file" "$imported" --output="artifacts/canary-roundtrip/$filename"
+            python3 tools/validate_elementor_deep.py "$imported" --output="artifacts/canary-roundtrip/$stem-deep.json"
+            python3 tools/audit_elementor_json.py "$imported" --inventory artifacts/canary-runtime-inventory.json
+            cp "$imported" "artifacts/canary-imported/$filename"
+            npx wp-env run cli wp --user=admin ejl render "$runtime_imported" --slug="$stem" --page-template=elementor_canvas --output="/var/www/html/wp-content/plugins/elementor-json-lab/.runtime/manifests/$filename"
+          done
+          cp wordpress-plugin/elementor-json-lab/.runtime/manifests/*.json artifacts/canary-render/
+      - name: Run cross-browser responsive tests
+        run: npm run test:visual
+      - name: Save run-scoped public canary evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: elementor-current-canary
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Destroy disposable environment
+        if: always()
+        shell: bash
+        run: |
+          npx wp-env stop || true
+          rm -f .wp-env.override.json
