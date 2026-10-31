@@ -2,9 +2,37 @@ name: Diagnose Elementor importer roundtrip
 
 on:
   workflow_dispatch:
+    inputs:
+      elementor_core_version:
+        description: '4.3.1 current baseline; 4.2.3 legacy importer regression probe (expected Atomic data loss)'
+        required: true
+        type: choice
+        default: '4.3.1'
+        options:
+          - '4.3.1'
+          - '4.2.3'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-importer.yml'
+      - 'tests/test_importer_diagnostic_versions.py'
+      - 'tools/compare_elementor_roundtrip.py'
+      - 'tools/validate_elementor_deep.py'
+      - 'wordpress-plugin/elementor-json-lab/**'
+      - '.github/workflows/validate.yml'
+      - '.wp-env.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'templates/**'
 
 permissions:
   contents: read
+
+# Keep the supported default aligned with Elementor JSON QA. The explicitly
+# selected legacy version is a negative probe: any semantic loss stays a failure.
+env:
+  ELEMENTOR_CORE_VERSION: ${{ inputs.elementor_core_version || '4.3.1' }}
+  HELLO_ELEMENTOR_VERSION: '3.5.1'
 
 jobs:
   diagnose:
@@ -12,11 +40,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '24.18.0'
 
       - name: Install locked tooling
         run: npm ci --no-fund
@@ -36,9 +66,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wp-env run cli wp plugin install elementor -- --version=4.2.3 --activate
+          npx wp-env run cli wp plugin install elementor -- --version="$ELEMENTOR_CORE_VERSION" --activate
           npx wp-env run cli wp plugin activate elementor-json-lab
-          npx wp-env run cli wp theme install hello-elementor -- --version=3.4.9 --activate
+          npx wp-env run cli wp theme install hello-elementor -- --version="$HELLO_ELEMENTOR_VERSION" --activate
           npx wp-env run cli wp user get admin --field=ID
 
       - name: Diagnose official importer and semantic roundtrip
