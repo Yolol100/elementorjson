@@ -109,6 +109,21 @@ jobs:
       - name: Install locked test tooling
         run: npm ci --no-fund
 
+      - name: Verify patched npm dependency graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const pkg = require('./package.json');
+          const lock = require('./package-lock.json');
+          for (const [name,version] of Object.entries({glob:'14.0.3', minimatch:'11.0.4'})) {
+            if (pkg.overrides?.[name] !== version) throw Error('Missing secure override ' + name);
+            const nodes = Object.entries(lock.packages).filter(([path]) => path==='node_modules/'+name || path.endsWith('/node_modules/'+name));
+            if (!nodes.length || nodes.some(([,x]) => x.version!==version)) throw Error('Unsafe lockfile version: ' + name);
+            if (require('./node_modules/'+name+'/package.json').version!==version) throw Error('Installed version mismatch: ' + name);
+          }
+          NODE
+          npm ls glob minimatch @wordpress/env
       - name: Capture committed npm lockfile
         shell: bash
         run: |
