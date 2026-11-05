@@ -22,6 +22,8 @@ GitHub CodeQL scans supported JavaScript/TypeScript, Python and GitHub Actions s
 
 Dependabot monitors npm and GitHub Actions updates. [CVE-2026-97058](https://github.com/advisories/ghsa-hp3w-g68c-fv3c) has no upstream `sprintf-js` patch. This repository removes the vulnerable development-only dependency chain `@wordpress/env -> js-yaml@3 -> argparse@1 -> sprintf-js` by pinning `argparse@2.0.1` in npm `overrides`. Keep `npm ci`, `npm audit`, the lockfile regression and the pinned WordPress CLI smoke tests green. Reevaluate the override when `@wordpress/env` drops `js-yaml@3` naturally; do not claim a patched `sprintf-js` version.
 
+The Elementor runtime's existing `@wordpress/env` tooling also resolves `glob` and `minimatch`. Security remediation uses exact npm overrides (`glob 14.0.3`, `minimatch 11.0.4`) with a regenerated lockfile. The existing runtime CI verifies the installed versions, `npm audit`, and actual WordPress/Elementor behavior before release. These overrides must not be treated as proof of compatibility without a green exact-head runtime test.
+
 ## Public pull request isolation
 
 Automatic pull request and main-push QA must run in Free/Core mode. Even if
