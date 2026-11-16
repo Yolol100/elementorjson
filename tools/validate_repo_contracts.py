@@ -193,7 +193,7 @@ def validate_toolkit(value, root=Path(".")):
         if package is not None:
             dependencies = package.get("devDependencies")
             pin = dependencies.get("@playwright/test") if isinstance(dependencies, dict) else None
-            if not isinstance(pin, str) or re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+", pin) is None:
+            if not isinstance(pin, str) or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", pin) is None:
                 errors.append("package.json: @playwright/test must be an exact version pin")
             elif lockfile is not None:
                 packages = lockfile.get("packages")
