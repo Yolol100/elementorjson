@@ -22,6 +22,44 @@ class RepositoryContractTests(unittest.TestCase):
     def test_repository_contracts_match_elementor_runtime_boundaries(self):
         self.assertEqual(validate_repository_contracts(ROOT), [])
 
+    def test_playwright_dependency_contract_uses_single_exact_pin(self):
+        toolkit = json.loads((ROOT / "toolkit-contract.json").read_text(encoding="utf-8"))
+        playwright = next(tool for tool in toolkit["tools"] if tool["id"] == "playwright")
+        self.assertEqual(playwright["version"], "package.json#devDependencies.@playwright/test")
+        mutated = copy.deepcopy(toolkit)
+        next(tool for tool in mutated["tools"] if tool["id"] == "playwright")["version"] = "1.64.1"
+        self.assertTrue(
+            any("playwright version must resolve from package.json" in error for error in validate_toolkit(mutated, ROOT))
+        )
+
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "package.json").write_text(
+                json.dumps({"devDependencies": {"@playwright/test": "^1.65.0"}}), encoding="utf-8"
+            )
+            (root / "package-lock.json").write_text(
+                json.dumps({"packages": {"": {"devDependencies": {"@playwright/test": "1.65.0"}},
+                                         "node_modules/@playwright/test": {"version": "1.65.0"}}}),
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                any("exact version pin" in error for error in validate_toolkit(toolkit, root))
+            )
+            (root / "package.json").write_text(
+                json.dumps({"devDependencies": {"@playwright/test": "1.65.0"}}), encoding="utf-8"
+            )
+            self.assertTrue(
+                all("version differs from exact package.json pin" not in error for error in validate_toolkit(toolkit, root))
+            )
+            (root / "package-lock.json").write_text(
+                json.dumps({"packages": {"": {"devDependencies": {"@playwright/test": "1.64.1"}},
+                                         "node_modules/@playwright/test": {"version": "1.64.1"}}}),
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                any("version differs from exact package.json pin" in error for error in validate_toolkit(toolkit, root))
+            )
+
     def test_runtime_rejects_private_visibility_regression(self):
         runtime = json.loads((ROOT / "runtime-contract.json").read_text(encoding="utf-8"))
         runtime["privacy"]["repository_visibility_assumption"] = "private"
