@@ -61,3 +61,6 @@ jobs:
           assert covered==set(ids), f'unwired tools: {set(ids)-covered}'
           print('toolkit-contract: OK')
           PY
+
+      - name: Validate canonical Playwright package pin and repository contracts
+        run: python3 tools/validate_repo_contracts.py
