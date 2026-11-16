@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -176,6 +177,36 @@ def validate_toolkit(value, root=Path(".")):
         for required_tool in REQUIRED_TOOL_IDS:
             if required_tool not in assertion_tools:
                 errors.append(f"toolkit-contract.json: usage assertion missing for required tool: {required_tool}")
+
+    # Resolve Playwright from one exact npm pin; do not duplicate its version in this contract.
+    playwright = next(
+        (item for item in tools if isinstance(item, dict) and item.get("id") == "playwright"),
+        None,
+    ) if isinstance(tools, list) else None
+    if playwright is not None:
+        if playwright.get("version") != "package.json#devDependencies.@playwright/test":
+            errors.append("toolkit-contract.json: playwright version must resolve from package.json")
+        package, package_errors = load_object(root / "package.json")
+        lockfile, lock_errors = load_object(root / "package-lock.json")
+        errors.extend(package_errors)
+        errors.extend(lock_errors)
+        if package is not None:
+            dependencies = package.get("devDependencies")
+            pin = dependencies.get("@playwright/test") if isinstance(dependencies, dict) else None
+            if not isinstance(pin, str) or re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+", pin) is None:
+                errors.append("package.json: @playwright/test must be an exact version pin")
+            elif lockfile is not None:
+                packages = lockfile.get("packages")
+                if not isinstance(packages, dict):
+                    errors.append("package-lock.json: packages map missing")
+                else:
+                    root_package = packages.get("")
+                    root_deps = root_package.get("devDependencies") if isinstance(root_package, dict) else None
+                    locked_pin = root_deps.get("@playwright/test") if isinstance(root_deps, dict) else None
+                    installed = packages.get("node_modules/@playwright/test")
+                    installed_pin = installed.get("version") if isinstance(installed, dict) else None
+                    if locked_pin != pin or installed_pin != pin:
+                        errors.append("package-lock.json: @playwright/test version differs from exact package.json pin")
 
     boundaries = value.get("boundaries")
     if not isinstance(boundaries, list) or not boundaries or not all(isinstance(item, str) and item.strip() for item in boundaries):
