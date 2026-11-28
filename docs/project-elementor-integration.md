@@ -66,3 +66,7 @@ The repository is public. Public visibility strengthens the data boundary. Never
 ## Final gate
 
 After the last implementation change, require two stable green final controlled-runtime rounds before staging/release handoff. For target or release claims, continue through `website-qa-checklist` rather than upgrading controlled-runtime evidence by wording.
+
+## Native migration preflight
+
+The optional local-only [native migration preflight](native-migration-preflight.md) supports conservative source inventory and a content-only native block candidate. It does not add a live runtime, infer styles, or change the existing final gate.
