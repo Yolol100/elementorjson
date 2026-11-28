@@ -85,3 +85,7 @@ Voor runtime-, render-, Visual Target- of native Kit-wijzigingen moeten de relev
 ## Licentie
 
 Deze repository bevat momenteel geen open-sourcelicentie. Hergebruik, distributie of afgeleide werken zijn niet toegestaan zonder expliciete toestemming van de rechthebbende.
+
+## Optional local native migration preflight
+
+See [native migration preflight](docs/native-migration-preflight.md) for the strict content-candidate allowlist and private handoff to WordPress and Website QA. This is not visual or migration acceptance.
